@@ -157,28 +157,31 @@ with aba1:
             placeholder="Ex: Post para Instagram, público jovem, mensagem de erro no app..."
         )
     
-    col1, col2 = st.columns([1, 4])
-    with col1:
-        if st.button("Revisar", type="primary"):
-            if texto_original:
-                with st.spinner("Revisando com IA..."):
-                    prompt = f"Revise este texto seguindo as regras. Mantenha o sentido original. Responda APENAS com o texto revisado.\n\nTEXTO: {texto_original}"
-                    resultado = chamar_groq(prompt, contexto)
+    if st.button("Revisar", type="primary"):
+        if texto_original:
+            with st.spinner("Revisando com IA..."):
+                prompt = f"Revise este texto seguindo as regras. Mantenha o sentido original. Responda APENAS com o texto revisado.\n\nTEXTO: {texto_original}"
+                resultado = chamar_groq(prompt, contexto)
+                
+                if resultado:
+                    # Layout melhorado com colunas e expansão
+                    col_orig, col_rev = st.columns(2)
                     
-                    if resultado:
+                    with col_orig:
                         st.markdown("**📄 Original**")
                         st.info(texto_original)
-                        
+                    
+                    with col_rev:
                         st.markdown("**✅ Revisado**")
                         st.success(resultado)
-                        
-                        # Salvar revisão para aprendizado
-                        if salvar_revisao(texto_original, resultado, contexto):
-                            st.caption("💾 Revisão salva para aprendizado")
-                    else:
-                        st.error("Erro ao revisar. Tente novamente.")
-            else:
-                st.warning("Digite um texto para revisar")
+                    
+                    # Salvar revisão
+                    if salvar_revisao(texto_original, resultado, contexto):
+                        st.caption("💾 Revisão salva para aprendizado")
+                else:
+                    st.error("Erro ao revisar. Tente novamente.")
+        else:
+            st.warning("Digite um texto para revisar")
 
 with aba2:
     st.subheader("Criação de Conteúdo")
@@ -207,7 +210,7 @@ with aba2:
                     st.markdown("**✨ Texto criado**")
                     st.success(resultado)
                     
-                    # Salvar criação como revisão também
+                    # Salvar criação
                     salvar_revisao(f"[CRIAÇÃO] Assunto: {assunto} | Tom: {tom}", resultado, contexto_criacao)
                 else:
                     st.error("Erro ao criar. Tente novamente.")
