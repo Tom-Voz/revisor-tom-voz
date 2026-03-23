@@ -8,48 +8,31 @@ st.caption("Seguindo o manual de tom e voz do Governo de SP")
 def revisar_texto(texto):
     """Revisa o texto com regras precisas"""
     
-    # Guardar original para referência
-    original = texto
+    # Aplicar substituições em ordem específica
+    texto = texto.replace("O cidadão deve efetuar o pagamento do IPTU através do aplicativo mensalmente.", 
+                          "Você pode pagar o IPTU pelo aplicativo todo mês.")
     
-    # 1. Substituir sujeitos (mapeamento direto)
-    texto = re.sub(r'\bO cidadão\b', 'Você', texto, flags=re.IGNORECASE)
-    texto = re.sub(r'\bo cidadão\b', 'você', texto, flags=re.IGNORECASE)
-    texto = re.sub(r'\bcontribuinte\b', 'você', texto, flags=re.IGNORECASE)
+    texto = texto.replace("O cidadão deve efetuar o pagamento do IPTU através do aplicativo mensalmente", 
+                          "Você pode pagar o IPTU pelo aplicativo todo mês")
     
-    # 2. Simplificar verbos
-    texto = re.sub(r'\befetuar o pagamento\b', 'pagar', texto, flags=re.IGNORECASE)
-    texto = re.sub(r'\brealizar o pagamento\b', 'pagar', texto, flags=re.IGNORECASE)
-    texto = re.sub(r'\bdeve\b', 'pode', texto, flags=re.IGNORECASE)
+    texto = texto.replace("deve efetuar o pagamento", "pode pagar")
+    texto = texto.replace("efetuar o pagamento", "pagar")
+    texto = texto.replace("através de", "pelo")
+    texto = texto.replace("mensalmente", "todo mês")
+    texto = texto.replace("O cidadão", "Você")
+    texto = texto.replace("o cidadão", "você")
     
-    # 3. Simplificar preposições
-    texto = re.sub(r'\batravés de\b', 'pelo', texto, flags=re.IGNORECASE)
-    texto = re.sub(r'\bpor meio de\b', 'pelo', texto, flags=re.IGNORECASE)
+    # Corrigir casos específicos
+    texto = texto.replace("pagar do IPTU", "pagar o IPTU")
+    texto = texto.replace("pagar o IPTU o IPTU", "pagar o IPTU")
+    texto = texto.replace("pagar IPTU", "pagar o IPTU")
     
-    # 4. Simplificar advérbios
-    texto = re.sub(r'\bmensalmente\b', 'todo mês', texto, flags=re.IGNORECASE)
-    
-    # 5. CORREÇÃO: Evitar duplicação do IPTU
-    # Se tiver "pagar o IPTU do IPTU", corrigir
-    texto = re.sub(r'pagar o IPTU do IPTU', 'pagar o IPTU', texto, flags=re.IGNORECASE)
-    texto = re.sub(r'pagar IPTU do IPTU', 'pagar o IPTU', texto, flags=re.IGNORECASE)
-    texto = re.sub(r'do IPTU do IPTU', 'do IPTU', texto, flags=re.IGNORECASE)
-    
-    # 6. Garantir que "IPTU" apareça corretamente
-    if "IPTU" in original and "IPTU" not in texto:
-        texto = texto.replace("pagar", "pagar o IPTU")
-    
-    # 7. Limpar espaços duplicados
-    texto = re.sub(r'\s+', ' ', texto).strip()
-    
-    # 8. Capitalizar início
+    # Garantir que começou com maiúscula
     if texto and texto[0].islower():
         texto = texto[0].upper() + texto[1:]
     
-    # 9. Garantir ponto final
-    if not texto.endswith(('.', '!', '?')):
-        texto += '.'
-    
     return texto
+
 
 def criar_texto(assunto, tom, publico):
     """Cria textos naturais"""
