@@ -8,12 +8,12 @@ st.caption("Seguindo o manual de tom e voz do Governo de SP")
 def revisar_texto(texto):
     """Revisa o texto com regras precisas"""
     
-    # Aplicar substituições em ordem específica
-    texto = texto.replace("O cidadão deve efetuar o pagamento do IPTU através do aplicativo mensalmente.", 
-                          "Você pode pagar o IPTU pelo aplicativo todo mês.")
-    
+    # Substituições diretas
     texto = texto.replace("O cidadão deve efetuar o pagamento do IPTU através do aplicativo mensalmente", 
                           "Você pode pagar o IPTU pelo aplicativo todo mês")
+    
+    texto = texto.replace("O cidadão deve efetuar o pagamento do IPTU através do aplicativo mensalmente.", 
+                          "Você pode pagar o IPTU pelo aplicativo todo mês.")
     
     texto = texto.replace("deve efetuar o pagamento", "pode pagar")
     texto = texto.replace("efetuar o pagamento", "pagar")
@@ -22,12 +22,13 @@ def revisar_texto(texto):
     texto = texto.replace("O cidadão", "Você")
     texto = texto.replace("o cidadão", "você")
     
-    # Corrigir casos específicos
+    # Correções
     texto = texto.replace("pagar do IPTU", "pagar o IPTU")
     texto = texto.replace("pagar o IPTU o IPTU", "pagar o IPTU")
     texto = texto.replace("pagar IPTU", "pagar o IPTU")
+    texto = texto.replace("pelo aplicativo todo mês", "pelo aplicativo todo mês")
     
-    # Garantir que começou com maiúscula
+    # Garantir maiúscula no início
     if texto and texto[0].islower():
         texto = texto[0].upper() + texto[1:]
     
@@ -57,7 +58,6 @@ def criar_texto(assunto, tom, publico):
         }
     }
     
-    # Identificar categoria
     assunto_lower = assunto.lower()
     if "link" in assunto_lower or "útil" in assunto_lower:
         categoria = "links"
@@ -66,7 +66,6 @@ def criar_texto(assunto, tom, publico):
     else:
         categoria = "iptu"
     
-    # Pegar texto
     tom_key = tom.lower()
     texto = textos[categoria].get(tom_key, textos[categoria]["informativo"])
     
@@ -104,7 +103,7 @@ with aba1:
             st.session_state.exemplo = "O cidadão deve efetuar o pagamento do IPTU através do aplicativo mensalmente."
             st.rerun()
     
-    if "exemplo" in st.session_state:
+    if "exemplo" in st.session_state and not texto_original:
         texto_original = st.session_state.exemplo
         st.rerun()
 
