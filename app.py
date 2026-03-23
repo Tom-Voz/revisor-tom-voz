@@ -30,9 +30,10 @@ Regras práticas:
 # Configurar a chave API
 try:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    model = genai.GenerativeModel('gemini-1.5-flash')
-except:
-    st.error("Erro: Chave API não configurada. Configure nos secrets do Streamlit.")
+    # Usando modelo disponível gratuitamente
+    model = genai.GenerativeModel('gemini-1.5-pro')
+except Exception as e:
+    st.error(f"Erro de configuração: {e}")
     st.stop()
 
 # Abas para as duas funcionalidades
@@ -42,10 +43,10 @@ with aba1:
     st.subheader("Revisão de Conteúdo")
     st.markdown("Cole um texto e ele será revisado seguindo o tom e voz do Governo de SP.")
     
-    texto_original = st.text_area("Texto para revisar:", height=200)
+    texto_original = st.text_area("Texto para revisar:", height=200, placeholder="Digite ou cole seu texto aqui...")
     
     if st.button("Revisar Texto", type="primary"):
-        if texto_original:
+        if texto_original and texto_original.strip():
             with st.spinner("Revisando..."):
                 prompt = f"""
                 Você é um revisor de conteúdo do Governo de São Paulo.
@@ -64,9 +65,12 @@ with aba1:
                 
                 Responda APENAS com o texto revisado, sem explicações.
                 """
-                response = model.generate_content(prompt)
-                st.markdown("### 📄 Texto Revisado")
-                st.write(response.text)
+                try:
+                    response = model.generate_content(prompt)
+                    st.markdown("### 📄 Texto Revisado")
+                    st.write(response.text)
+                except Exception as e:
+                    st.error(f"Erro ao revisar: {e}")
         else:
             st.warning("Digite um texto para revisar.")
 
@@ -84,7 +88,7 @@ with aba2:
     detalhes = st.text_area("Detalhes adicionais:", height=100, placeholder="Informações importantes que devem ser incluídas...")
     
     if st.button("Criar Conteúdo", type="primary"):
-        if assunto:
+        if assunto and assunto.strip():
             with st.spinner("Criando..."):
                 prompt = f"""
                 Você é um redator do Governo de São Paulo.
@@ -95,8 +99,8 @@ with aba2:
                 Crie um conteúdo seguindo estas especificações:
                 - Assunto: {assunto}
                 - Tom: {tom}
-                - Público-alvo: {publico}
-                - Detalhes: {detalhes}
+                - Público-alvo: {publico if publico else "Cidadãos de São Paulo"}
+                - Detalhes: {detalhes if detalhes else "Nenhum detalhe adicional"}
                 
                 Regras:
                 - Use linguagem simples e acessível
@@ -106,8 +110,11 @@ with aba2:
                 
                 Responda APENAS com o conteúdo criado, sem explicações.
                 """
-                response = model.generate_content(prompt)
-                st.markdown("### ✨ Conteúdo Criado")
-                st.write(response.text)
+                try:
+                    response = model.generate_content(prompt)
+                    st.markdown("### ✨ Conteúdo Criado")
+                    st.write(response.text)
+                except Exception as e:
+                    st.error(f"Erro ao criar: {e}")
         else:
             st.warning("Digite o assunto do conteúdo.")
