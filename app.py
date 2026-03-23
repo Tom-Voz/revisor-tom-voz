@@ -5,53 +5,25 @@ st.set_page_config(page_title="Revisor de Tom e Voz", page_icon="📝")
 st.title("📝 Revisor e Criador de Conteúdo")
 st.caption("Seguindo o manual de tom e voz do Governo de SP")
 
-# ==================== MANUAL COMPLETO ====================
-# Baseado em todas as páginas do manual
-
-# Pilares da voz
-VOZ_SIMPLES = """
-- Use linguagem direta e objetiva
-- Mantenha apenas as informações necessárias
-- Frases curtas (máx. 20-25 palavras)
-- Evite ruídos na comunicação
-"""
-
-VOZ_PRESTATIVA = """
-- Seja proativo para resolver problemas
-- Use palavras de fácil entendimento
-- Linguagem acolhedora e empática
-- Evite termos técnicos e siglas sem explicação
-- Use a 1ª pessoa do plural (nós)
-"""
-
-VOZ_CONFIAVEL = """
-- Informações claras e corretas
-- Evite termos que gerem dúvida ou duplo sentido
-- Mantenha a mesma linguagem em toda comunicação
-- Gramática semi-formal (nem muito informal, nem muito formal)
-"""
-
-# Processo de edição (5 passos)
-PASSOS_EDICAO = """
-1. EXPANDIR: incluir contexto que o leitor precisa
-2. CONCISAR: reduzir redundâncias
-3. DIALOGAR: usar "você", falar com o leitor
-4. REVISAR: texto empático pode ser mais longo
-5. SIMPLIFICAR: substituir ambiguidades, usar termos comuns
-"""
-
-# Boas práticas
-BOAS_PRATICAS = {
-    "frases": "máximo 20-25 palavras",
-    "paragrafos": "3-4 frases por parágrafo",
-    "siglas": "escrever por extenso na primeira menção",
-    "numeros": "usar algarismos arábicos",
-    "voz": "preferir voz ativa",
-    "pontuacao": "usar com moderação"
-}
-
 def aplicar_manual_completo(texto):
     """Aplica todas as diretrizes do manual"""
+    
+    # ========== 0. CASOS ESPECIAIS (linguagem jurídica) ==========
+    # Simplificar expressões jurídicas comuns
+    juridicas = [
+        (r'Em vista da previsão legal da incapacidade dos menores de 16 anos responderem pelos atos da vida civil',
+         'Menores de 16 anos não podem responder legalmente por si mesmos'),
+        (r'devidamente representados', 'acompanhados dos pais ou responsáveis'),
+        (r'nas solicitações de suas carteiras de identidade', 'para pedir a carteira de identidade'),
+        (r'os menores devem estar', 'eles precisam estar'),
+        (r'responderem pelos atos da vida civil', 'assumir responsabilidades legais'),
+        (r'previsão legal', 'a lei determina'),
+        (r'incapacidade dos menores', 'menores não têm capacidade legal'),
+    ]
+    
+    for busca, substitui in juridicas:
+        if busca in texto:
+            texto = texto.replace(busca, substitui)
     
     # ========== 1. VOZ SIMPLES ==========
     # Remover redundâncias
@@ -62,10 +34,19 @@ def aplicar_manual_completo(texto):
     texto = re.sub(r'mensalmente', 'todo mês', texto, flags=re.IGNORECASE)
     texto = re.sub(r'anualmente', 'todo ano', texto, flags=re.IGNORECASE)
     
+    # Simplificar expressões burocráticas
+    texto = re.sub(r'em vista de', 'como', texto, flags=re.IGNORECASE)
+    texto = re.sub(r'devidamente', '', texto, flags=re.IGNORECASE)
+    texto = re.sub(r'previsão legal', 'a lei', texto, flags=re.IGNORECASE)
+    texto = re.sub(r'atos da vida civil', 'responsabilidades legais', texto, flags=re.IGNORECASE)
+    
     # ========== 2. VOZ PRESTATIVA ==========
     # Tornar acolhedor e proativo
     if "RG" in texto and "documento" not in texto.lower():
         texto = texto.replace("RG", "RG (Registro Geral)", 1)
+    
+    if "carteira de identidade" in texto.lower():
+        texto = texto.replace("carteira de identidade", "RG")
     
     # Usar "você" para dialogar
     texto = re.sub(r'o cidadão', 'você', texto, flags=re.IGNORECASE)
@@ -73,10 +54,8 @@ def aplicar_manual_completo(texto):
     texto = re.sub(r'os cidadãos', 'vocês', texto, flags=re.IGNORECASE)
     texto = re.sub(r'qualquer pessoa', 'você', texto, flags=re.IGNORECASE)
     texto = re.sub(r'contribuinte', 'você', texto, flags=re.IGNORECASE)
-    
-    # Usar 1ª pessoa do plural quando apropriado
-    if "estamos" not in texto.lower() and "conosco" in texto.lower():
-        texto = texto.replace("conosco", "com a gente")
+    texto = re.sub(r'os menores', 'crianças e adolescentes', texto, flags=re.IGNORECASE)
+    texto = re.sub(r'menores de 16 anos', 'crianças e adolescentes com menos de 16 anos', texto, flags=re.IGNORECASE)
     
     # ========== 3. VOZ CONFIÁVEL ==========
     # Evitar duplo sentido e ambiguidades
@@ -100,20 +79,26 @@ def aplicar_manual_completo(texto):
         (r'utilizar', 'usar'),
         (r'preencher as informações', 'preencher'),
         (r'dias úteis', 'dias úteis (de segunda a sexta)'),
+        (r'devidamente representados', 'acompanhados dos pais ou responsáveis'),
+        (r'responder pelos atos', 'assumir responsabilidades'),
     ]
     for busca, substitui in simplificacoes:
         texto = re.sub(busca, substitui, texto, flags=re.IGNORECASE)
     
-    # ========== 5. BOAS PRÁTICAS ==========
+    # ========== 5. REESCREVER FRASES COMPLEXAS ==========
+    # Reescrever frases com "devem estar" para tom mais direto
+    if "devem estar" in texto:
+        texto = texto.replace("devem estar", "precisam estar")
+    
+    if "devem" in texto and "acompanhados" not in texto:
+        texto = re.sub(r'devem', 'precisam', texto)
+    
+    # ========== 6. BOAS PRÁTICAS ==========
     # Frases curtas (quebrar frases longas)
     if len(texto.split()) > 25:
         partes = texto.split('. ')
         if len(partes) > 1:
             texto = '.\n\n'.join(partes)
-    
-    # Evitar CAIXA ALTA
-    if texto.isupper():
-        texto = texto.title()
     
     # Correções finais
     texto = re.sub(r'\s+', ' ', texto).strip()
@@ -238,8 +223,13 @@ with aba1:
                 st.warning("Digite um texto para revisar.")
     
     with col2:
-        if st.button("📋 Carregar exemplo", use_container_width=True):
+        if st.button("📋 Carregar exemplo 1", use_container_width=True):
             st.session_state.exemplo = "O RG fica pronto em 5 dias úteis. O RG pode ser retirado por qualquer pessoa com o protocolo"
+            st.rerun()
+    
+    with col2:
+        if st.button("📋 Carregar exemplo 2", use_container_width=True):
+            st.session_state.exemplo = "Em vista da previsão legal da incapacidade dos menores de 16 anos responderem pelos atos da vida civil, nas solicitações de suas carteiras de identidade os menores devem estar devidamente representados."
             st.rerun()
     
     if "exemplo" in st.session_state and not texto_original:
