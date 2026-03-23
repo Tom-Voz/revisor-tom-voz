@@ -28,12 +28,25 @@ Regras práticas:
 """
 
 # Configurar a chave API
-try:
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    # Usando modelo disponível gratuitamente
-    model = genai.GenerativeModel('gemini-1.0-pro')
-except Exception as e:
-    st.error(f"Erro de configuração: {e}")
+api_key = st.secrets["GEMINI_API_KEY"]
+genai.configure(api_key=api_key)
+
+# Tentar diferentes nomes de modelo
+model_names = ['gemini-pro', 'gemini-1.0-pro', 'models/gemini-pro']
+model = None
+
+for name in model_names:
+    try:
+        model = genai.GenerativeModel(name)
+        # Teste rápido
+        test = model.generate_content("test")
+        st.success(f"✅ Modelo conectado: {name}")
+        break
+    except:
+        continue
+
+if model is None:
+    st.error("❌ Não foi possível conectar a nenhum modelo. Verifique sua chave API.")
     st.stop()
 
 # Abas para as duas funcionalidades
