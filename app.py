@@ -1,108 +1,64 @@
 import streamlit as st
-import requests
-import json
+import google.generativeai as genai
 
-# Configurar a página
 st.set_page_config(page_title="Revisor de Tom e Voz", page_icon="📝")
 st.title("📝 Revisor e Criador de Conteúdo")
 st.caption("Seguindo o manual de tom e voz do Governo de SP")
 
-# Manual de tom e voz
 MANUAL = """
 Voz do Governo de SP:
-- Simples: usar linguagem clara, sem termos técnicos desnecessários
-- Resolutiva: focar em resolver problemas e dar respostas práticas
-- Respeitosa: tratar todas as pessoas com educação, sem informalidade excessiva
+- Simples: linguagem clara, sem termos técnicos
+- Resolutiva: foco em resolver problemas
+- Respeitosa: tratar todos com educação
 
-Tom (varia conforme situação):
-- Informativo: objetivo, com dados claros
-- Empático: acolhedor, especialmente em situações difíceis
-- Motivador: para engajar em eventos ou programas
-
-Regras práticas:
-- Use "você" para se dirigir ao leitor
-- Prefira frases curtas
-- Evite siglas sem explicação
+Regras:
+- Use "você"
+- Frases curtas
+- Evite siglas
 """
 
-# Pegar a chave API
-API_KEY = st.secrets["GEMINI_API_KEY"]
-API_URL = f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={API_KEY}"
-
-def chamar_gemini(prompt):
-    """Função para chamar a API do Gemini"""
-    headers = {
-        "Content-Type": "application/json"
-    }
+try:
+    API_KEY = st.secrets["GEMINI_API_KEY"]
+    genai.configure(api_key=API_KEY)
     
-    data = {
-        "contents": [{
-            "parts": [{"text": prompt}]
-        }]
-    }
+    # Listar modelos disponíveis para descobrir qual funciona
+    modelos = genai.list_models()
+    modelo_usado = None
     
-    response = requests.post(API_URL, headers=headers, json=data)
+    for m in modelos:
+        if 'generateContent' in m.supported_generation_methods:
+            modelo_usado = m.name
+            break
     
-    if response.status_code == 200:
-        resultado = response.json()
-        return resultado["candidates"][0]["content"]["parts"][0]["text"]
+    if modelo_usado:
+        st.success(f"✅ Usando modelo: {modelo_usado}")
+        model = genai.GenerativeModel(modelo_usado)
     else:
-        return f"Erro: {response.status_code} - {response.text}"
+        st.error("Nenhum modelo disponível")
+        st.stop()
+        
+except Exception as e:
+    st.error(f"Erro: {e}")
+    st.info("Verifique sua chave API em Settings → Secrets")
+    st.stop()
 
-# Abas
-aba1, aba2 = st.tabs(["✏️ Revisar Texto", "✨ Criar Texto"])
+aba1, aba2 = st.tabs(["✏️ Revisar", "✨ Criar"])
 
 with aba1:
-    st.subheader("Revisão de Conteúdo")
-    texto_original = st.text_area("Texto para revisar:", height=200)
-    
-    if st.button("Revisar Texto", type="primary"):
-        if texto_original:
+    texto = st.text_area("Texto para revisar:", height=150)
+    if st.button("Revisar"):
+        if texto:
             with st.spinner("Revisando..."):
-                prompt = f"""
-                Você é um revisor do Governo de SP.
-                
-                MANUAL:
-                {MANUAL}
-                
-                Revise este texto seguindo as regras acima. 
-                Deixe mais simples, use "você", e seja direto.
-                
-                TEXTO: {texto_original}
-                
-                Responda apenas com o texto revisado.
-                """
-                resultado = chamar_gemini(prompt)
-                st.markdown("### 📄 Texto Revisado")
-                st.write(resultado)
-        else:
-            st.warning("Digite um texto.")
+                prompt = f"Siga estas regras: {MANUAL}\n\nRevise este texto: {texto}\n\nResponda apenas com o texto revisado."
+                resposta = model.generate_content(prompt)
+                st.write(resposta.text)
 
 with aba2:
-    st.subheader("Criação de Conteúdo")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        assunto = st.text_input("Assunto:")
-    with col2:
-        tom = st.selectbox("Tom:", ["Informativo", "Empático", "Motivador"])
-    
-    if st.button("Criar Conteúdo", type="primary"):
+    assunto = st.text_input("Assunto:")
+    tom = st.selectbox("Tom:", ["Informativo", "Empático", "Motivador"])
+    if st.button("Criar"):
         if assunto:
             with st.spinner("Criando..."):
-                prompt = f"""
-                Você é um redator do Governo de SP.
-                
-                MANUAL: {MANUAL}
-                
-                Crie um conteúdo sobre: {assunto}
-                Tom: {tom}
-                Use linguagem simples e direta.
-                
-                Responda apenas com o texto criado.
-                """
-                resultado = chamar_gemini(prompt)
-                st.markdown("### ✨ Conteúdo Criado")
-                st.write(resultado)
-        else:
-            st.warning("Digite o assunto.")
+                prompt = f"Regras: {MANUAL}\nTom: {tom}\n\nCrie um texto sobre: {assunto}"
+                resposta = model.generate_content(prompt)
+                st.write(resposta.text)
