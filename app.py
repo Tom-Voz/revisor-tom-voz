@@ -31,7 +31,7 @@ Regras práticas:
 try:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
     # Usando modelo disponível gratuitamente
-    model = genai.GenerativeModel('gemini-1.5-pro')
+    model = genai.GenerativeModel('gemini-1.0-pro')
 except Exception as e:
     st.error(f"Erro de configuração: {e}")
     st.stop()
