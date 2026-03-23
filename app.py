@@ -27,7 +27,7 @@ Regras práticas:
 
 # Pegar a chave API
 API_KEY = st.secrets["GEMINI_API_KEY"]
-API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={API_KEY}"
+API_URL = f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={API_KEY}"
 
 def chamar_gemini(prompt):
     """Função para chamar a API do Gemini"""
