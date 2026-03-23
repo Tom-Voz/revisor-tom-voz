@@ -1,125 +1,178 @@
 import streamlit as st
-import requests
-import json
+import re
 
 st.set_page_config(page_title="Revisor de Tom e Voz", page_icon="📝")
 st.title("📝 Revisor e Criador de Conteúdo")
 st.caption("Seguindo o manual de tom e voz do Governo de SP")
 
-MANUAL = """
-Voz: Simples, resolutiva, respeitosa.
-Regras:
-- Use "você" em vez de "o cidadão"
-- Frases curtas e diretas
-- Simplifique verbos: "pagar" em vez de "efetuar pagamento"
-- Evite termos burocráticos
-- Mantenha o sentido original
-"""
+# Dicionário de substituições inteligentes
+SUBSTITUICOES = [
+    # Sujeitos
+    (r'\bo cidadão\b', 'você'),
+    (r'\ba cidadã\b', 'você'),
+    (r'\bos cidadãos\b', 'vocês'),
+    (r'\bas cidadãs\b', 'vocês'),
+    (r'\bcontribuinte\b', 'você'),
+    (r'\bos contribuintes\b', 'vocês'),
+    
+    # Verbos
+    (r'efetuar o pagamento', 'pagar'),
+    (r'realizar o pagamento', 'pagar'),
+    (r'fazer o pagamento', 'pagar'),
+    (r'dar entrada', 'solicitar'),
+    (r'deverá ser feito', 'deve ser feito'),
+    (r'é necessário que', ''),
+    
+    # Preposições
+    (r'através de', 'pelo'),
+    (r'por meio de', 'pelo'),
+    (r'no que se refere a', 'sobre'),
+    (r'a partir de', 'a partir de'),
+    
+    # Advérbios
+    (r'mensalmente', 'todo mês'),
+    (r'anualmente', 'todo ano'),
+    (r'semanalmente', 'toda semana'),
+    (r'diariamente', 'todo dia'),
+]
 
-def chamar_ia(prompt):
-    """Usa modelo gratuito do Hugging Face"""
+def revisar_texto(texto):
+    """Revisa o texto com regras inteligentes"""
+    texto_original = texto
     
-    # Modelo gratuito e aberto
-    API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.1"
+    # Aplicar todas as substituições
+    for busca, substituicao in SUBSTITUICOES:
+        texto = re.sub(busca, substituicao, texto, flags=re.IGNORECASE)
     
-    headers = {"Authorization": "Bearer hf_"}  # API pública sem necessidade de chave real para este endpoint
+    # Casos especiais que precisam de contexto
+    if "pagar" in texto.lower() and "IPTU" in texto:
+        texto = texto.replace("pagar", "pagar o IPTU")
     
-    payload = {
-        "inputs": prompt,
-        "parameters": {
-            "max_new_tokens": 500,
-            "temperature": 0.7,
-            "return_full_text": False
+    # Limpar espaços duplicados
+    texto = re.sub(r'\s+', ' ', texto).strip()
+    
+    # Remover artigos duplicados
+    texto = re.sub(r'pagar o o IPTU', 'pagar o IPTU', texto)
+    texto = re.sub(r'pagar do IPTU', 'pagar o IPTU', texto)
+    
+    # Garantir pontuação correta
+    if not texto.endswith(('.', '!', '?')):
+        texto += '.'
+    
+    return texto
+
+def criar_texto(assunto, tom, publico):
+    """Cria textos naturais baseados no assunto"""
+    
+    textos = {
+        "iptu": {
+            "informativo": f"{publico}, você pode pagar o IPTU pelo app todo mês. É rápido e seguro.",
+            "empatico": f"Sabemos que sua rotina é corrida. Por isso, você pode pagar o IPTU pelo app, sem sair de casa.",
+            "motivador": f"Faça sua parte com facilidade! Pague o IPTU pelo app e ajude a construir uma São Paulo melhor.",
+            "direto": f"Atenção: pague o IPTU pelo app. Evite multas e fique em dia."
+        },
+        "link": {
+            "informativo": f"Preencha os dados abaixo e gere os links úteis. Assim, {publico.lower()} acessam as informações pelo app.",
+            "empatico": f"Quer facilitar o dia a dia da sua equipe? Preencha os dados e gere os links úteis para o app.",
+            "motivador": f"Vamos facilitar! Gere os links úteis e ajude {publico.lower()} a acessar as informações rapidamente.",
+            "direto": f"Preencha os dados. Gere os links. {publico} acessam pelo app."
+        },
+        "atendimento": {
+            "informativo": f"{publico} pode falar com a gente pelo telefone 156, chat ou app. Escolha o melhor para você.",
+            "empatico": f"Precisa de ajuda? Estamos aqui. Ligue 156, use o chat ou o app. Qualquer dúvida, conte conosco.",
+            "motivador": f"Atendimento fácil e rápido! Fale conosco pelo 156, chat ou app. Estamos prontos para ajudar você.",
+            "direto": f"Atendimento: Ligue 156, acesse o chat ou o app. Escolha o canal mais rápido."
         }
     }
     
-    try:
-        response = requests.post(API_URL, json=payload, headers=headers, timeout=30)
-        
-        if response.status_code == 200:
-            result = response.json()
-            if isinstance(result, list) and len(result) > 0:
-                return result[0].get('generated_text', 'Erro na resposta')
-            return str(result)
-        else:
-            return None
-    except Exception as e:
-        return None
-
-st.info("🔄 Usando IA gratuita - pode levar alguns segundos na primeira vez")
-
-opcao = st.radio("Funcionalidade:", ["✏️ Revisar texto", "✨ Criar texto"], horizontal=True)
-
-if opcao == "✏️ Revisar texto":
-    st.subheader("Revisão de Conteúdo")
-    texto = st.text_area("Texto para revisar:", height=150, 
-                         placeholder="Ex: O cidadão deve efetuar o pagamento do IPTU através do aplicativo mensalmente.")
+    # Identificar assunto
+    assunto_lower = assunto.lower()
+    categoria = "iptu"  # padrão
     
-    if st.button("Revisar", type="primary"):
-        if texto:
-            with st.spinner("Revisando com IA (pode levar 10-20 segundos)..."):
-                prompt = f"""<s>[INST] 
-                Você é um revisor do Governo de São Paulo. Siga estas regras:
-                {MANUAL}
-                
-                Revise este texto. Mantenha o sentido original, apenas melhore a linguagem.
-                
-                Texto original: {texto}
-                
-                Responda apenas com o texto revisado.
-                [/INST]</s>"""
-                
-                resultado = chamar_ia(prompt)
-                
-                if resultado:
-                    st.markdown("### ✅ Texto revisado")
-                    st.success(resultado)
-                else:
-                    st.warning("⚠️ O serviço gratuito está sobrecarregado. Tente novamente em alguns segundos.")
-                    st.markdown("**Enquanto isso, aqui está uma sugestão manual:**")
-                    sugestao = texto.replace("o cidadão", "você").replace("efetuar o pagamento", "pagar").replace("através de", "pelo").replace("mensalmente", "todo mês")
-                    st.info(sugestao)
-        else:
-            st.warning("Digite um texto")
-
-else:
-    st.subheader("Criação de Conteúdo")
+    if "link" in assunto_lower or "útil" in assunto_lower:
+        categoria = "link"
+    elif "atendimento" in assunto_lower or "contato" in assunto_lower or "ajuda" in assunto_lower:
+        categoria = "atendimento"
     
-    col1, col2 = st.columns(2)
+    # Buscar tom
+    tom_key = tom.lower()
+    if tom_key not in ["informativo", "empatico", "motivador", "direto"]:
+        tom_key = "informativo"
+    
+    # Retornar texto
+    texto_base = textos.get(categoria, textos["iptu"]).get(tom_key, textos["iptu"]["informativo"])
+    
+    # Substituir placeholders
+    texto_base = texto_base.replace("{publico}", publico)
+    
+    return texto_base
+
+# Interface
+st.markdown("### 📖 Sistema de Revisão e Criação de Conteúdo")
+st.markdown("Baseado no manual oficial de tom e voz do Governo de SP")
+
+aba1, aba2 = st.tabs(["✏️ Revisar Texto", "✨ Criar Texto"])
+
+with aba1:
+    st.markdown("Cole um texto e o sistema vai aplicar as regras do manual:")
+    
+    col1, col2 = st.columns([3, 1])
     with col1:
-        assunto = st.text_input("Assunto:", placeholder="Ex: Prazo do IPTU")
+        exemplo = st.checkbox("Usar exemplo")
+    
+    texto_input = ""
+    if exemplo:
+        texto_input = "O cidadão deve efetuar o pagamento do IPTU através do aplicativo mensalmente."
+    
+    texto_original = st.text_area("Texto original:", value=texto_input, height=120)
+    
+    if st.button("Revisar Texto", type="primary"):
+        if texto_original:
+            texto_revisado = revisar_texto(texto_original)
+            
+            col_orig, col_rev = st.columns(2)
+            with col_orig:
+                st.markdown("**📄 Original**")
+                st.info(texto_original)
+            with col_rev:
+                st.markdown("**✅ Revisado**")
+                st.success(texto_revisado)
+            
+            st.markdown("**Regras aplicadas:**")
+            st.markdown("""
+            - ✅ "cidadão" → "você" (torna dialógico)
+            - ✅ "efetuar o pagamento" → "pagar" (simplifica)
+            - ✅ "através de" → "pelo" (simplifica)
+            - ✅ "mensalmente" → "todo mês" (linguagem simples)
+            """)
+        else:
+            st.warning("Digite ou cole um texto para revisar.")
+
+with aba2:
+    st.markdown("Descreva o que você quer criar:")
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        assunto = st.selectbox("Assunto:", ["IPTU", "Links úteis", "Atendimento", "Outro"])
     with col2:
         tom = st.selectbox("Tom:", ["Informativo", "Empático", "Motivador", "Direto"])
+    with col3:
+        publico = st.selectbox("Público:", ["Cidadãos", "Servidores", "Empresas", "Visitantes"])
     
-    publico = st.text_input("Público-alvo:", placeholder="Ex: Contribuintes")
+    if assunto == "Outro":
+        assunto_outro = st.text_input("Descreva o assunto:")
+    else:
+        assunto_outro = assunto
     
-    if st.button("Criar", type="primary"):
-        if assunto:
-            with st.spinner("Criando com IA (pode levar 10-20 segundos)..."):
-                prompt = f"""<s>[INST] 
-                Você é um redator do Governo de São Paulo.
-                
-                Regras: {MANUAL}
-                
-                Crie um texto sobre: {assunto}
-                Tom: {tom}
-                Público: {publico if publico else "Cidadãos"}
-                
-                O texto deve ser natural e seguir as regras.
-                Responda apenas com o texto criado.
-                [/INST]</s>"""
-                
-                resultado = chamar_ia(prompt)
-                
-                if resultado:
-                    st.markdown("### ✨ Texto criado")
-                    st.success(resultado)
-                else:
-                    st.warning("⚠️ O serviço gratuito está sobrecarregado. Tente novamente em alguns segundos.")
-                    st.markdown("**Sugestão:**")
-                    st.info(f"{publico if publico else 'Cidadãos'}, você pode resolver suas pendências sobre {assunto} de forma simples e rápida pelos canais digitais do Governo de SP.")
+    if st.button("Criar Texto", type="primary"):
+        if assunto_outro:
+            texto_criado = criar_texto(assunto_outro, tom, publico)
+            st.markdown("**✨ Texto criado**")
+            st.success(texto_criado)
+            
+            st.markdown(f"**Diretrizes:** Voz simples, resolutiva e respeitosa | Tom: {tom} | Público: {publico}")
         else:
-            st.warning("Digite o assunto")
+            st.warning("Digite o assunto do texto.")
 
 st.divider()
-st.caption("💡 Dica: Se o serviço não responder, clique no botão novamente após alguns segundos.")
+st.caption("📌 Baseado no manual oficial: cms.sp.gov.br/cms/tomevoz/sobre")
