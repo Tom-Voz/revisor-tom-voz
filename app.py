@@ -1,11 +1,16 @@
 import streamlit as st
 import requests
+import json
+import sqlite3
+import pandas as pd
+from datetime import datetime
+import os
 
 st.set_page_config(page_title="Revisor de Tom e Voz", page_icon="📝")
 st.title("📝 Revisor e Criador de Conteúdo")
 st.caption("Seguindo o manual de tom e voz do Governo de SP")
 
-# Manual de tom e voz
+# ==================== MANUAL DE TOM E VOZ ====================
 MANUAL = """
 Você é um especialista em comunicação do Governo de São Paulo.
 
@@ -23,27 +28,96 @@ Regras:
 - Seja acolhedor quando apropriado
 """
 
-# Pegar chave do Groq
+# ==================== CONFIGURAÇÃO DO BANCO DE DADOS ====================
+def init_db():
+    """Inicializa o banco de dados SQLite"""
+    conn = sqlite3.connect('revisoes.db')
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS revisoes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            texto_original TEXT,
+            texto_revisado TEXT,
+            contexto TEXT,
+            data TEXT,
+            aprovada INTEGER DEFAULT 0
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+def salvar_revisao(original, revisado, contexto=""):
+    """Salva uma revisão no banco de dados"""
+    try:
+        conn = sqlite3.connect('revisoes.db')
+        c = conn.cursor()
+        c.execute('''
+            INSERT INTO revisoes (texto_original, texto_revisado, contexto, data)
+            VALUES (?, ?, ?, ?)
+        ''', (original, revisado, contexto, datetime.now().isoformat()))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        st.error(f"Erro ao salvar: {e}")
+        return False
+
+def listar_revisoes():
+    """Lista as revisões salvas"""
+    try:
+        conn = sqlite3.connect('revisoes.db')
+        df = pd.read_sql_query("SELECT * FROM revisoes ORDER BY data DESC", conn)
+        conn.close()
+        return df
+    except:
+        return pd.DataFrame()
+
+def get_insights():
+    """Gera insights a partir das revisões salvas"""
+    df = listar_revisoes()
+    if df.empty:
+        return None
+    
+    # Contar revisões
+    total = len(df)
+    ultima_semana = len(df[df['data'] > (datetime.now().isoformat().split('T')[0])])
+    
+    # Padrões simples
+    palavras_comuns = []
+    for texto in df['texto_original'].head(20):
+        palavras_comuns.extend(texto.lower().split()[:5])
+    
+    return {
+        "total": total,
+        "ultima_semana": ultima_semana,
+        "palavras_comuns": palavras_comuns[:10]
+    }
+
+# ==================== FUNÇÃO DE IA (GROQ) ====================
 try:
     API_KEY = st.secrets["GROQ_API_KEY"]
 except:
     st.error("Configure a chave API GROQ_API_KEY em Settings → Secrets")
     st.stop()
 
-# URL da API Groq (OpenAI-compatible)
 API_URL = "https://api.groq.com/openai/v1/chat/completions"
 
-def chamar_groq(prompt):
-    """Chama a API do Groq"""
+def chamar_groq(prompt, contexto_extra=""):
+    """Chama a API do Groq com contexto extra"""
     headers = {
         "Authorization": f"Bearer {API_KEY}",
         "Content-Type": "application/json"
     }
     
+    # Montar mensagem com contexto
+    mensagem = MANUAL
+    if contexto_extra:
+        mensagem += f"\n\nInformação adicional sobre o canal/público: {contexto_extra}"
+    
     data = {
         "model": "llama-3.3-70b-versatile",
         "messages": [
-            {"role": "system", "content": MANUAL},
+            {"role": "system", "content": mensagem},
             {"role": "user", "content": prompt}
         ],
         "temperature": 0.7,
@@ -57,54 +131,124 @@ def chamar_groq(prompt):
             resultado = response.json()
             return resultado["choices"][0]["message"]["content"]
         else:
-            st.error(f"Erro {response.status_code}: {response.text[:200]}")
             return None
     except Exception as e:
-        st.error(f"Erro: {e}")
         return None
 
-# Teste rápido
-with st.spinner("Verificando conexão..."):
-    teste = chamar_groq("Diga apenas: OK")
-    if teste:
-        st.success("✅ Conectado ao Groq (Llama 3.3 70B)!")
-    else:
-        st.error("❌ Falha na conexão. Verifique sua chave.")
+# ==================== INTERFACE ====================
+# Inicializar banco de dados
+init_db()
 
-st.divider()
+# Remover diagnóstico - mostrar apenas status sucinto
+st.success("✅ Sistema pronto")
 
-aba1, aba2 = st.tabs(["✏️ Revisar Texto", "✨ Criar Texto"])
+aba1, aba2, aba3 = st.tabs(["✏️ Revisar Texto", "✨ Criar Texto", "📊 Aprendizado"])
 
 with aba1:
-    texto = st.text_area("Texto para revisar:", height=150)
+    st.subheader("Revisão de Conteúdo")
     
-    if st.button("Revisar", type="primary"):
-        if texto:
-            with st.spinner("Revisando com IA..."):
-                prompt = f"Revise este texto seguindo as regras. Mantenha o sentido original. Responda APENAS com o texto revisado.\n\nTEXTO: {texto}"
-                resultado = chamar_groq(prompt)
-                if resultado:
-                    st.markdown("**Original**")
-                    st.info(texto)
-                    st.markdown("**Revisado**")
-                    st.success(resultado)
-        else:
-            st.warning("Digite um texto")
+    texto_original = st.text_area("Texto para revisar:", height=120)
+    
+    # Campo de contexto extra
+    with st.expander("➕ Contexto adicional (opcional)"):
+        contexto = st.text_area(
+            "Informe o canal, público ou situação:",
+            height=80,
+            placeholder="Ex: Post para Instagram, público jovem, mensagem de erro no app..."
+        )
+    
+    col1, col2 = st.columns([1, 4])
+    with col1:
+        if st.button("Revisar", type="primary"):
+            if texto_original:
+                with st.spinner("Revisando com IA..."):
+                    prompt = f"Revise este texto seguindo as regras. Mantenha o sentido original. Responda APENAS com o texto revisado.\n\nTEXTO: {texto_original}"
+                    resultado = chamar_groq(prompt, contexto)
+                    
+                    if resultado:
+                        st.markdown("**📄 Original**")
+                        st.info(texto_original)
+                        
+                        st.markdown("**✅ Revisado**")
+                        st.success(resultado)
+                        
+                        # Salvar revisão para aprendizado
+                        if salvar_revisao(texto_original, resultado, contexto):
+                            st.caption("💾 Revisão salva para aprendizado")
+                    else:
+                        st.error("Erro ao revisar. Tente novamente.")
+            else:
+                st.warning("Digite um texto para revisar")
 
 with aba2:
-    assunto = st.text_input("Assunto:")
-    tom = st.selectbox("Tom:", ["Informativo", "Empático", "Motivador", "Direto"])
+    st.subheader("Criação de Conteúdo")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        assunto = st.text_input("Assunto:", placeholder="Ex: Prazo do IPTU")
+    with col2:
+        tom = st.selectbox("Tom:", ["Informativo", "Empático", "Motivador", "Direto"])
+    
+    # Campo de contexto extra
+    with st.expander("➕ Contexto adicional (opcional)"):
+        contexto_criacao = st.text_area(
+            "Informe o canal, público ou situação:",
+            height=80,
+            placeholder="Ex: Post para Instagram, WhatsApp, público jovem..."
+        )
     
     if st.button("Criar", type="primary"):
         if assunto:
             with st.spinner("Criando com IA..."):
                 prompt = f"Crie um texto sobre: {assunto}. Tom: {tom}. Público: Cidadãos de São Paulo. Responda APENAS com o texto criado."
-                resultado = chamar_groq(prompt)
+                resultado = chamar_groq(prompt, contexto_criacao)
+                
                 if resultado:
-                    st.markdown("**Texto criado**")
+                    st.markdown("**✨ Texto criado**")
                     st.success(resultado)
+                    
+                    # Salvar criação como revisão também
+                    salvar_revisao(f"[CRIAÇÃO] Assunto: {assunto} | Tom: {tom}", resultado, contexto_criacao)
+                else:
+                    st.error("Erro ao criar. Tente novamente.")
         else:
             st.warning("Digite o assunto")
 
+with aba3:
+    st.subheader("📊 Aprendizado e Insights")
+    
+    # Mostrar insights
+    insights = get_insights()
+    if insights:
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Total de revisões salvas", insights["total"])
+        with col2:
+            st.metric("Revisões na última semana", insights["ultima_semana"])
+        
+        if insights["palavras_comuns"]:
+            st.write("**Palavras mais frequentes nos textos:**")
+            st.write(", ".join(set(insights["palavras_comuns"])))
+    else:
+        st.info("Nenhuma revisão salva ainda. Use a ferramenta de revisão e os textos serão armazenados aqui.")
+    
+    st.divider()
+    
+    # Mostrar últimas revisões
+    st.write("**Últimas revisões salvas:**")
+    df = listar_revisoes()
+    if not df.empty:
+        # Mostrar apenas as 5 últimas
+        for _, row in df.head(5).iterrows():
+            with st.expander(f"📝 Revisão de {row['data'][:16]}"):
+                st.write("**Original:**")
+                st.write(row['texto_original'][:200] + "..." if len(row['texto_original']) > 200 else row['texto_original'])
+                st.write("**Revisado:**")
+                st.write(row['texto_revisado'][:200] + "..." if len(row['texto_revisado']) > 200 else row['texto_revisado'])
+                if row['contexto']:
+                    st.write(f"**Contexto:** {row['contexto'][:100]}")
+    else:
+        st.write("Nenhuma revisão salva ainda.")
+
 st.divider()
-st.caption("📌 IA: Groq (Llama 3.3 70B) | Gratuito | 1.000 requisições/dia")
+st.caption("📌 IA: Groq (Llama 3.3 70B) | Revisões salvas para aprendizado contínuo")
