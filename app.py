@@ -65,21 +65,32 @@ def chamar_gemini(prompt):
     """Chama a API do Gemini"""
     url = f"https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key={st.secrets['GEMINI_API_KEY']}"
     headers = {"Content-Type": "application/json"}
+    
+    # Formato correto da API
     data = {
         "contents": [{
             "parts": [{"text": prompt}]
-        }]
+        }],
+        "generationConfig": {
+            "temperature": 0.7,
+            "maxOutputTokens": 500
+        }
     }
     
     try:
         response = requests.post(url, headers=headers, json=data, timeout=30)
         
+        # Log para diagnóstico
+        st.write(f"Status: {response.status_code}")
+        
         if response.status_code == 200:
             resultado = response.json()
             return resultado["candidates"][0]["content"]["parts"][0]["text"]
         else:
+            st.write(f"Erro: {response.text}")
             return None
-    except:
+    except Exception as e:
+        st.write(f"Exceção: {e}")
         return None
 
 # ========== INTERFACE ==========
