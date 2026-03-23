@@ -1,30 +1,58 @@
 import streamlit as st
-import google.generativeai as genai
+import requests
 
-st.title("Diagnóstico da API Gemini")
+st.set_page_config(page_title="Diagnóstico", page_icon="🔧")
+st.title("🔧 Diagnóstico da API Gemini")
+
+# Pegar chave
+try:
+    API_KEY = st.secrets["GEMINI_API_KEY"]
+    st.write(f"✅ Chave encontrada: {API_KEY[:10]}... (tamanho: {len(API_KEY)})")
+except Exception as e:
+    st.error(f"❌ Chave não encontrada: {e}")
+    st.stop()
+
+# Testar endpoint de listagem de modelos
+st.write("### Teste 1: Listar modelos disponíveis")
+
+url_lista = f"https://generativelanguage.googleapis.com/v1/models?key={API_KEY}"
+try:
+    response = requests.get(url_lista, timeout=10)
+    st.write(f"Status: {response.status_code}")
+    
+    if response.status_code == 200:
+        dados = response.json()
+        modelos = [m["name"] for m in dados.get("models", [])]
+        st.success(f"✅ Modelos encontrados: {len(modelos)}")
+        for m in modelos[:5]:
+            st.write(f"- {m}")
+    else:
+        st.error(f"Erro: {response.text}")
+except Exception as e:
+    st.error(f"Erro na requisição: {e}")
+
+# Testar com modelo específico
+st.write("### Teste 2: Testar modelo gemini-2.0-flash")
+
+url_teste = f"https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key={API_KEY}"
+headers = {"Content-Type": "application/json"}
+data = {
+    "contents": [{
+        "parts": [{"text": "Diga apenas: OK funcionou"}]
+    }]
+}
 
 try:
-    api_key = st.secrets["GEMINI_API_KEY"]
-    st.write(f"✅ Chave carregada (tamanho: {len(api_key)} caracteres)")
+    response = requests.post(url_teste, headers=headers, json=data, timeout=15)
+    st.write(f"Status: {response.status_code}")
     
-    # Configurar
-    genai.configure(api_key=api_key)
-    
-    # Listar TODOS os modelos
-    st.write("### Lista completa de modelos:")
-    modelos = genai.list_models()
-    
-    lista_modelos = list(modelos)
-    
-    if len(lista_modelos) == 0:
-        st.error("❌ Nenhum modelo retornado pela API")
-        st.info("Isso geralmente significa que a chave API é inválida ou não tem permissões")
+    if response.status_code == 200:
+        resultado = response.json()
+        texto = resultado["candidates"][0]["content"]["parts"][0]["text"]
+        st.success(f"✅ Funcionou! Resposta: {texto}")
     else:
-        for m in lista_modelos:
-            st.write(f"- {m.name}")
-            st.write(f"  Métodos: {m.supported_generation_methods}")
-            st.write("---")
-            
+        st.error(f"Erro: {response.text}")
 except Exception as e:
     st.error(f"Erro: {e}")
-    st.write("Tipo do erro:", type(e).__name__)
+
+st.info("Copie esta página para mim para que eu possa ver o resultado.")
