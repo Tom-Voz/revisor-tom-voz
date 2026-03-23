@@ -2,63 +2,64 @@ import streamlit as st
 import google.generativeai as genai
 
 st.set_page_config(page_title="Revisor de Tom e Voz", page_icon="📝")
-st.title("📝 Revisor e Criador de Conteúdo")
-st.caption("Seguindo o manual de tom e voz do Governo de SP")
+st.title("📝 Revisor de Tom e Voz")
+st.caption("Manual do Governo de SP")
 
+# Manual resumido
 MANUAL = """
-Voz do Governo de SP:
-- Simples: linguagem clara, sem termos técnicos
-- Resolutiva: foco em resolver problemas
-- Respeitosa: tratar todos com educação
-
 Regras:
-- Use "você"
-- Frases curtas
-- Evite siglas
+- Use linguagem simples e clara
+- Use "você" para se dirigir ao leitor
+- Seja direto e resolutivo
+- Trate com respeito (mas sem formalidade excessiva)
 """
 
+st.write("### ✅ Status da conexão")
+
 try:
-    API_KEY = st.secrets["GEMINI_API_KEY"]
-    genai.configure(api_key=API_KEY)
+    # Pegar chave
+    api_key = st.secrets["GEMINI_API_KEY"]
+    genai.configure(api_key=api_key)
     
-    # Listar modelos disponíveis para descobrir qual funciona
-    modelos = genai.list_models()
-    modelo_usado = None
-    
-    for m in modelos:
-        if 'generateContent' in m.supported_generation_methods:
-            modelo_usado = m.name
-            break
-    
-    if modelo_usado:
-        st.success(f"✅ Usando modelo: {modelo_usado}")
-        model = genai.GenerativeModel(modelo_usado)
-    else:
-        st.error("Nenhum modelo disponível")
-        st.stop()
-        
+    # Tentar modelo
+    try:
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        test = model.generate_content("Diga OK")
+        st.success("✅ Conectado com gemini-1.5-flash")
+    except:
+        try:
+            model = genai.GenerativeModel('gemini-pro')
+            test = model.generate_content("Diga OK")
+            st.success("✅ Conectado com gemini-pro")
+        except:
+            st.error("❌ Nenhum modelo disponível")
+            st.stop()
+            
 except Exception as e:
     st.error(f"Erro: {e}")
-    st.info("Verifique sua chave API em Settings → Secrets")
     st.stop()
 
-aba1, aba2 = st.tabs(["✏️ Revisar", "✨ Criar"])
+st.divider()
 
-with aba1:
-    texto = st.text_area("Texto para revisar:", height=150)
+# Interface simples
+opcao = st.radio("Escolha:", ["Revisar texto", "Criar texto"])
+
+if opcao == "Revisar texto":
+    texto = st.text_area("Texto original:", height=150)
     if st.button("Revisar"):
         if texto:
             with st.spinner("Revisando..."):
-                prompt = f"Siga estas regras: {MANUAL}\n\nRevise este texto: {texto}\n\nResponda apenas com o texto revisado."
+                prompt = f"{MANUAL}\n\nRevise este texto seguindo as regras acima:\n{texto}"
                 resposta = model.generate_content(prompt)
+                st.write("### Texto revisado:")
                 st.write(resposta.text)
 
-with aba2:
-    assunto = st.text_input("Assunto:")
-    tom = st.selectbox("Tom:", ["Informativo", "Empático", "Motivador"])
+else:
+    assunto = st.text_input("Assunto do texto:")
     if st.button("Criar"):
         if assunto:
             with st.spinner("Criando..."):
-                prompt = f"Regras: {MANUAL}\nTom: {tom}\n\nCrie um texto sobre: {assunto}"
+                prompt = f"{MANUAL}\n\nCrie um texto sobre: {assunto}"
                 resposta = model.generate_content(prompt)
+                st.write("### Texto criado:")
                 st.write(resposta.text)
