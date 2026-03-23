@@ -33,7 +33,6 @@ def revisar_texto(texto):
     
     return texto
 
-
 def criar_texto(assunto, tom, publico):
     """Cria textos naturais"""
     
