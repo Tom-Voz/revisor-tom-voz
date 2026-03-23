@@ -1,133 +1,108 @@
 import streamlit as st
-import google.generativeai as genai
+import requests
+import json
 
 # Configurar a página
 st.set_page_config(page_title="Revisor de Tom e Voz", page_icon="📝")
 st.title("📝 Revisor e Criador de Conteúdo")
 st.caption("Seguindo o manual de tom e voz do Governo de SP")
 
-# Manual de tom e voz extraído do site
+# Manual de tom e voz
 MANUAL = """
 Voz do Governo de SP:
 - Simples: usar linguagem clara, sem termos técnicos desnecessários
 - Resolutiva: focar em resolver problemas e dar respostas práticas
 - Respeitosa: tratar todas as pessoas com educação, sem informalidade excessiva
-- Transparente: ser honesto e direto
 
 Tom (varia conforme situação):
 - Informativo: objetivo, com dados claros
 - Empático: acolhedor, especialmente em situações difíceis
 - Motivador: para engajar em eventos ou programas
-- Direto: para mensagens de erro ou avisos importantes
 
 Regras práticas:
 - Use "você" para se dirigir ao leitor
 - Prefira frases curtas
 - Evite siglas sem explicação
-- Seja inclusivo (linguagem neutra quando possível)
 """
 
-# Configurar a chave API
-api_key = st.secrets["GEMINI_API_KEY"]
-genai.configure(api_key=api_key)
+# Pegar a chave API
+API_KEY = st.secrets["GEMINI_API_KEY"]
+API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={API_KEY}"
 
-# Tentar diferentes nomes de modelo
-model_names = ['gemini-pro', 'gemini-1.0-pro', 'models/gemini-pro']
-model = None
+def chamar_gemini(prompt):
+    """Função para chamar a API do Gemini"""
+    headers = {
+        "Content-Type": "application/json"
+    }
+    
+    data = {
+        "contents": [{
+            "parts": [{"text": prompt}]
+        }]
+    }
+    
+    response = requests.post(API_URL, headers=headers, json=data)
+    
+    if response.status_code == 200:
+        resultado = response.json()
+        return resultado["candidates"][0]["content"]["parts"][0]["text"]
+    else:
+        return f"Erro: {response.status_code} - {response.text}"
 
-for name in model_names:
-    try:
-        model = genai.GenerativeModel(name)
-        # Teste rápido
-        test = model.generate_content("test")
-        st.success(f"✅ Modelo conectado: {name}")
-        break
-    except:
-        continue
-
-if model is None:
-    st.error("❌ Não foi possível conectar a nenhum modelo. Verifique sua chave API.")
-    st.stop()
-
-# Abas para as duas funcionalidades
+# Abas
 aba1, aba2 = st.tabs(["✏️ Revisar Texto", "✨ Criar Texto"])
 
 with aba1:
     st.subheader("Revisão de Conteúdo")
-    st.markdown("Cole um texto e ele será revisado seguindo o tom e voz do Governo de SP.")
-    
-    texto_original = st.text_area("Texto para revisar:", height=200, placeholder="Digite ou cole seu texto aqui...")
+    texto_original = st.text_area("Texto para revisar:", height=200)
     
     if st.button("Revisar Texto", type="primary"):
-        if texto_original and texto_original.strip():
+        if texto_original:
             with st.spinner("Revisando..."):
                 prompt = f"""
-                Você é um revisor de conteúdo do Governo de São Paulo.
+                Você é um revisor do Governo de SP.
                 
-                MANUAL DE TOM E VOZ:
+                MANUAL:
                 {MANUAL}
                 
-                PROCESSO DE REVISÃO:
-                1. Expanda o texto com informações contextuais importantes
-                2. Torne mais conciso (elimine redundâncias)
-                3. Deixe mais dialógico (use "você", como se estivesse conversando)
-                4. Simplifique a linguagem (termos mais comuns, frases mais curtas)
+                Revise este texto seguindo as regras acima. 
+                Deixe mais simples, use "você", e seja direto.
                 
-                TEXTO ORIGINAL:
-                {texto_original}
+                TEXTO: {texto_original}
                 
-                Responda APENAS com o texto revisado, sem explicações.
+                Responda apenas com o texto revisado.
                 """
-                try:
-                    response = model.generate_content(prompt)
-                    st.markdown("### 📄 Texto Revisado")
-                    st.write(response.text)
-                except Exception as e:
-                    st.error(f"Erro ao revisar: {e}")
+                resultado = chamar_gemini(prompt)
+                st.markdown("### 📄 Texto Revisado")
+                st.write(resultado)
         else:
-            st.warning("Digite um texto para revisar.")
+            st.warning("Digite um texto.")
 
 with aba2:
     st.subheader("Criação de Conteúdo")
-    st.markdown("Descreva o que você quer criar e o tom desejado.")
     
     col1, col2 = st.columns(2)
     with col1:
-        assunto = st.text_input("Assunto do conteúdo:", placeholder="Ex: Prazo para pagamento de IPTU")
+        assunto = st.text_input("Assunto:")
     with col2:
-        tom = st.selectbox("Tom desejado:", ["Informativo", "Empático", "Motivador", "Direto"])
-    
-    publico = st.text_input("Público-alvo:", placeholder="Ex: Contribuintes de São Paulo")
-    detalhes = st.text_area("Detalhes adicionais:", height=100, placeholder="Informações importantes que devem ser incluídas...")
+        tom = st.selectbox("Tom:", ["Informativo", "Empático", "Motivador"])
     
     if st.button("Criar Conteúdo", type="primary"):
-        if assunto and assunto.strip():
+        if assunto:
             with st.spinner("Criando..."):
                 prompt = f"""
-                Você é um redator do Governo de São Paulo.
+                Você é um redator do Governo de SP.
                 
-                MANUAL DE TOM E VOZ:
-                {MANUAL}
+                MANUAL: {MANUAL}
                 
-                Crie um conteúdo seguindo estas especificações:
-                - Assunto: {assunto}
-                - Tom: {tom}
-                - Público-alvo: {publico if publico else "Cidadãos de São Paulo"}
-                - Detalhes: {detalhes if detalhes else "Nenhum detalhe adicional"}
+                Crie um conteúdo sobre: {assunto}
+                Tom: {tom}
+                Use linguagem simples e direta.
                 
-                Regras:
-                - Use linguagem simples e acessível
-                - Mantenha o tom {tom.lower()} durante todo o texto
-                - Inclua um título curto
-                - Texto deve ter entre 100 e 300 palavras
-                
-                Responda APENAS com o conteúdo criado, sem explicações.
+                Responda apenas com o texto criado.
                 """
-                try:
-                    response = model.generate_content(prompt)
-                    st.markdown("### ✨ Conteúdo Criado")
-                    st.write(response.text)
-                except Exception as e:
-                    st.error(f"Erro ao criar: {e}")
+                resultado = chamar_gemini(prompt)
+                st.markdown("### ✨ Conteúdo Criado")
+                st.write(resultado)
         else:
-            st.warning("Digite o assunto do conteúdo.")
+            st.warning("Digite o assunto.")
