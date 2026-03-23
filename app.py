@@ -1,56 +1,84 @@
 import streamlit as st
-import google.generativeai as genai
+import requests
+import json
 
 st.set_page_config(page_title="Revisor de Tom e Voz", page_icon="📝")
 st.title("📝 Revisor e Criador de Conteúdo")
 st.caption("Seguindo o manual de tom e voz do Governo de SP")
 
-# Manual oficial
 MANUAL = """
 Voz: Simples, resolutiva, respeitosa.
-Tom: Varia conforme contexto (informativo, empático, motivador, direto).
 Regras:
-- Use "você" para se dirigir ao leitor
+- Use "você" em vez de "o cidadão"
 - Frases curtas e diretas
-- Evite termos técnicos e burocráticos
-- Seja claro e objetivo
+- Simplifique verbos: "pagar" em vez de "efetuar pagamento"
+- Evite termos burocráticos
+- Mantenha o sentido original
 """
 
-# Configurar Gemini
-try:
-    api_key = st.secrets["GEMINI_API_KEY"]
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-1.5-flash')
-    st.success("✅ Conectado ao Gemini")
-except Exception as e:
-    st.error(f"Erro: {e}")
-    st.stop()
+def chamar_ia(prompt):
+    """Usa modelo gratuito do Hugging Face"""
+    
+    # Modelo gratuito e aberto
+    API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.1"
+    
+    headers = {"Authorization": "Bearer hf_"}  # API pública sem necessidade de chave real para este endpoint
+    
+    payload = {
+        "inputs": prompt,
+        "parameters": {
+            "max_new_tokens": 500,
+            "temperature": 0.7,
+            "return_full_text": False
+        }
+    }
+    
+    try:
+        response = requests.post(API_URL, json=payload, headers=headers, timeout=30)
+        
+        if response.status_code == 200:
+            result = response.json()
+            if isinstance(result, list) and len(result) > 0:
+                return result[0].get('generated_text', 'Erro na resposta')
+            return str(result)
+        else:
+            return None
+    except Exception as e:
+        return None
+
+st.info("🔄 Usando IA gratuita - pode levar alguns segundos na primeira vez")
 
 opcao = st.radio("Funcionalidade:", ["✏️ Revisar texto", "✨ Criar texto"], horizontal=True)
 
 if opcao == "✏️ Revisar texto":
     st.subheader("Revisão de Conteúdo")
-    texto = st.text_area("Texto para revisar:", height=150)
+    texto = st.text_area("Texto para revisar:", height=150, 
+                         placeholder="Ex: O cidadão deve efetuar o pagamento do IPTU através do aplicativo mensalmente.")
     
     if st.button("Revisar", type="primary"):
         if texto:
-            with st.spinner("Revisando com IA..."):
-                prompt = f"""
-                Você é um revisor do Governo de São Paulo.
-                
-                MANUAL:
+            with st.spinner("Revisando com IA (pode levar 10-20 segundos)..."):
+                prompt = f"""<s>[INST] 
+                Você é um revisor do Governo de São Paulo. Siga estas regras:
                 {MANUAL}
                 
-                TEXTO ORIGINAL:
-                {texto}
+                Revise este texto. Mantenha o sentido original, apenas melhore a linguagem.
                 
-                TAREFA: Revise o texto seguindo o manual.
-                Mantenha o sentido original, apenas melhore a linguagem.
-                Responda APENAS com o texto revisado, sem explicações.
-                """
-                resposta = model.generate_content(prompt)
-                st.markdown("### ✅ Texto revisado")
-                st.success(resposta.text)
+                Texto original: {texto}
+                
+                Responda apenas com o texto revisado.
+                [/INST]</s>"""
+                
+                resultado = chamar_ia(prompt)
+                
+                if resultado:
+                    st.markdown("### ✅ Texto revisado")
+                    st.success(resultado)
+                else:
+                    st.warning("⚠️ O serviço gratuito está sobrecarregado. Tente novamente em alguns segundos.")
+                    st.markdown("**Enquanto isso, aqui está uma sugestão manual:**")
+                    sugestao = texto.replace("o cidadão", "você").replace("efetuar o pagamento", "pagar").replace("através de", "pelo").replace("mensalmente", "todo mês")
+                    st.info(sugestao)
         else:
             st.warning("Digite um texto")
 
@@ -67,22 +95,31 @@ else:
     
     if st.button("Criar", type="primary"):
         if assunto:
-            with st.spinner("Criando com IA..."):
-                prompt = f"""
+            with st.spinner("Criando com IA (pode levar 10-20 segundos)..."):
+                prompt = f"""<s>[INST] 
                 Você é um redator do Governo de São Paulo.
                 
-                MANUAL:
-                {MANUAL}
+                Regras: {MANUAL}
                 
                 Crie um texto sobre: {assunto}
                 Tom: {tom}
                 Público: {publico if publico else "Cidadãos"}
                 
-                O texto deve ser natural, como se um humano escrevesse.
-                Responda APENAS com o texto criado.
-                """
-                resposta = model.generate_content(prompt)
-                st.markdown("### ✨ Texto criado")
-                st.success(resposta.text)
+                O texto deve ser natural e seguir as regras.
+                Responda apenas com o texto criado.
+                [/INST]</s>"""
+                
+                resultado = chamar_ia(prompt)
+                
+                if resultado:
+                    st.markdown("### ✨ Texto criado")
+                    st.success(resultado)
+                else:
+                    st.warning("⚠️ O serviço gratuito está sobrecarregado. Tente novamente em alguns segundos.")
+                    st.markdown("**Sugestão:**")
+                    st.info(f"{publico if publico else 'Cidadãos'}, você pode resolver suas pendências sobre {assunto} de forma simples e rápida pelos canais digitais do Governo de SP.")
         else:
             st.warning("Digite o assunto")
+
+st.divider()
+st.caption("💡 Dica: Se o serviço não responder, clique no botão novamente após alguns segundos.")
