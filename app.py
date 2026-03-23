@@ -1,108 +1,111 @@
 import streamlit as st
-import re
+import requests
+import json
 
 st.set_page_config(page_title="Revisor de Tom e Voz", page_icon="📝")
 st.title("📝 Revisor e Criador de Conteúdo")
 st.caption("Seguindo o manual de tom e voz do Governo de SP")
 
-def revisar_texto(texto):
-    """Revisão simples seguindo o manual"""
-    
-    # 1. Substituir termos formais por simples
-    texto = texto.replace("O cidadão", "Você")
-    texto = texto.replace("o cidadão", "você")
-    texto = texto.replace("deve efetuar o pagamento", "pode pagar")
-    texto = texto.replace("efetuar o pagamento", "pagar")
-    texto = texto.replace("através de", "pelo")
-    texto = texto.replace("mensalmente", "todo mês")
-    texto = texto.replace("realizar", "fazer")
-    
-    # 2. Tornar dialógico
-    texto = texto.replace("qualquer pessoa", "você")
-    texto = texto.replace("contribuinte", "você")
-    
-    # 3. Simplificar RG
-    texto = texto.replace("O RG", "Seu RG")
-    texto = texto.replace("o RG", "seu RG")
-    texto = texto.replace("pode ser retirado", "está disponível")
-    
-    # 4. Simplificar linguagem jurídica
-    texto = texto.replace("Em vista da previsão legal da incapacidade dos menores de 16 anos responderem pelos atos da vida civil", 
-                          "Menores de 16 anos não podem responder legalmente por si mesmos")
-    texto = texto.replace("devidamente representados", "acompanhados dos pais ou responsáveis")
-    texto = texto.replace("nas solicitações de suas carteiras de identidade", "para pedir o RG")
-    texto = texto.replace("os menores devem estar", "eles precisam estar")
-    
-    # 5. Corrigir frases
-    texto = texto.replace("Seu RG seu RG", "Seu RG")
-    texto = texto.replace("você você", "você")
-    
-    # 6. Garantir ponto final
-    if texto and texto[-1] not in '.!?':
-        texto += '.'
-    
-    return texto
+# Manual resumido
+MANUAL = """
+Voz: Simples, resolutiva, respeitosa.
+Regras:
+- Use "você" em vez de "o cidadão"
+- Use "pagar" em vez de "efetuar pagamento"
+- Use "pelo" em vez de "através de"
+- Use "todo mês" em vez de "mensalmente"
+- Frases curtas e diretas
+- Seja acolhedor quando necessário
+"""
 
-def criar_texto(assunto, tom):
-    """Cria conteúdo simples"""
+# Pegar chave dos secrets
+try:
+    API_KEY = st.secrets["GEMINI_API_KEY"]
+except:
+    st.error("Configure a chave API em Settings → Secrets")
+    st.stop()
+
+# URL correta da API
+API_URL = f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={API_KEY}"
+
+def chamar_gemini(prompt):
+    """Chama a API do Gemini"""
+    headers = {"Content-Type": "application/json"}
+    data = {
+        "contents": [{
+            "parts": [{"text": prompt}]
+        }]
+    }
     
-    if "iptu" in assunto.lower():
-        texto = f"Você pode pagar o IPTU pelo app todo mês. É rápido e você não precisa sair de casa."
-    elif "rg" in assunto.lower():
-        texto = f"Seu RG fica pronto em 5 dias úteis. Você pode retirar com o número do protocolo."
-    elif "atendimento" in assunto.lower():
-        texto = f"Você pode falar conosco pelo telefone 156, pelo chat ou pelo app. Escolha o melhor para você."
+    response = requests.post(API_URL, headers=headers, json=data)
+    
+    if response.status_code == 200:
+        resultado = response.json()
+        return resultado["candidates"][0]["content"]["parts"][0]["text"]
     else:
-        texto = f"Você pode resolver isso de forma simples. Acesse nossos canais digitais e faça agora mesmo."
-    
-    if tom == "Empático":
-        texto += " Estamos aqui para ajudar você."
-    elif tom == "Motivador":
-        texto += " Vamos juntos construir uma São Paulo melhor!"
-    elif tom == "Direto":
-        texto = "Atenção: " + texto[0].lower() + texto[1:]
-    
-    return texto
+        return None
 
-# Interface
-st.markdown("### 📖 Revisor e Criador de Conteúdo")
-st.markdown("Baseado no manual oficial de tom e voz do Governo de SP")
+st.info("✅ Sistema pronto. Digite um texto para revisar ou criar.")
 
 aba1, aba2 = st.tabs(["✏️ Revisar Texto", "✨ Criar Texto"])
 
 with aba1:
-    texto_original = st.text_area(
-        "Texto para revisar:", 
-        height=120,
-        placeholder="Cole seu texto aqui..."
-    )
+    texto = st.text_area("Texto para revisar:", height=150)
     
-    if st.button("Revisar Texto", type="primary"):
-        if texto_original:
-            texto_revisado = revisar_texto(texto_original)
-            
-            st.markdown("**📄 Original**")
-            st.info(texto_original)
-            
-            st.markdown("**✅ Revisado**")
-            st.success(texto_revisado)
+    if st.button("Revisar", type="primary"):
+        if texto:
+            with st.spinner("Revisando com IA..."):
+                prompt = f"""
+                Você é um revisor do Governo de São Paulo.
+                
+                Siga estas regras:
+                {MANUAL}
+                
+                Texto original: {texto}
+                
+                TAREFA: Revise o texto seguindo as regras. 
+                Mantenha o sentido original.
+                Responda APENAS com o texto revisado.
+                """
+                resultado = chamar_gemini(prompt)
+                
+                if resultado:
+                    st.markdown("**Original**")
+                    st.info(texto)
+                    st.markdown("**Revisado**")
+                    st.success(resultado)
+                else:
+                    st.error("Erro na API. Verifique sua chave.")
         else:
-            st.warning("Digite um texto para revisar.")
+            st.warning("Digite um texto")
 
 with aba2:
     col1, col2 = st.columns(2)
     with col1:
-        assunto = st.text_input("Assunto:", placeholder="Ex: IPTU, RG, atendimento")
+        assunto = st.text_input("Assunto:")
     with col2:
         tom = st.selectbox("Tom:", ["Informativo", "Empático", "Motivador", "Direto"])
     
-    if st.button("Criar Texto", type="primary"):
+    if st.button("Criar", type="primary"):
         if assunto:
-            texto_criado = criar_texto(assunto, tom)
-            st.markdown("**📝 Texto criado**")
-            st.success(texto_criado)
+            with st.spinner("Criando com IA..."):
+                prompt = f"""
+                Você é um redator do Governo de São Paulo.
+                
+                Regras: {MANUAL}
+                
+                Crie um texto sobre: {assunto}
+                Tom: {tom}
+                Público: Cidadãos de São Paulo
+                
+                Responda APENAS com o texto criado.
+                """
+                resultado = chamar_gemini(prompt)
+                
+                if resultado:
+                    st.markdown("**Texto criado**")
+                    st.success(resultado)
+                else:
+                    st.error("Erro na API. Verifique sua chave.")
         else:
-            st.warning("Digite o assunto.")
-
-st.divider()
-st.caption("📌 Manual oficial: cms.sp.gov.br/cms/tomevoz")
+            st.warning("Digite o assunto")
