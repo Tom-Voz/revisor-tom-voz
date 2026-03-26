@@ -1,28 +1,12 @@
 import streamlit as st
 import requests
-import json
 import sqlite3
 import pandas as pd
 from datetime import datetime
-import os
 
 st.set_page_config(page_title="Revisor de Tom e Voz", page_icon="📝")
 st.title("📝 Revisor e Criador de Conteúdo")
 st.caption("Seguindo o manual de tom e voz do Governo de SP")
-
-# ==================== CONFIGURAÇÃO DE ADMIN ====================
-# Defina aqui os e-mails que podem ver o aprendizado
-ADMINS = ["sip.poupatempo1@gmail.com"]  # <-- SUBSTITUA PELO SEU E-MAIL
-
-def is_admin():
-    """Verifica se o usuário atual é administrador"""
-    # No Streamlit Cloud, o e-mail do usuário pode ser obtido
-    try:
-        user_email = st.experimental_user.get("email", "")
-        return user_email in ADMINS
-    except:
-        # Se não conseguir obter e-mail, só mostra se for admin configurado
-        return False
 
 # ==================== MANUAL DE TOM E VOZ ====================
 MANUAL = """
@@ -44,7 +28,6 @@ Regras:
 
 # ==================== CONFIGURAÇÃO DO BANCO DE DADOS ====================
 def init_db():
-    """Inicializa o banco de dados SQLite"""
     conn = sqlite3.connect('revisoes.db')
     c = conn.cursor()
     c.execute('''
@@ -53,15 +36,13 @@ def init_db():
             texto_original TEXT,
             texto_revisado TEXT,
             contexto TEXT,
-            data TEXT,
-            aprovada INTEGER DEFAULT 0
+            data TEXT
         )
     ''')
     conn.commit()
     conn.close()
 
 def salvar_revisao(original, revisado, contexto=""):
-    """Salva uma revisão no banco de dados"""
     try:
         conn = sqlite3.connect('revisoes.db')
         c = conn.cursor()
@@ -72,11 +53,10 @@ def salvar_revisao(original, revisado, contexto=""):
         conn.commit()
         conn.close()
         return True
-    except Exception as e:
+    except:
         return False
 
 def listar_revisoes():
-    """Lista as revisões salvas"""
     try:
         conn = sqlite3.connect('revisoes.db')
         df = pd.read_sql_query("SELECT * FROM revisoes ORDER BY data DESC", conn)
@@ -86,22 +66,12 @@ def listar_revisoes():
         return pd.DataFrame()
 
 def get_insights():
-    """Gera insights a partir das revisões salvas"""
     df = listar_revisoes()
     if df.empty:
         return None
-    
-    total = len(df)
-    ultima_semana = len(df[df['data'] > (datetime.now().isoformat().split('T')[0])])
-    
-    palavras_comuns = []
-    for texto in df['texto_original'].head(20):
-        palavras_comuns.extend(texto.lower().split()[:5])
-    
     return {
-        "total": total,
-        "ultima_semana": ultima_semana,
-        "palavras_comuns": palavras_comuns[:10]
+        "total": len(df),
+        "ultima_semana": len(df[df['data'] > (datetime.now().isoformat().split('T')[0])])
     }
 
 # ==================== FUNÇÃO DE IA (GROQ) ====================
@@ -114,7 +84,6 @@ except:
 API_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 def chamar_groq(prompt, contexto_extra=""):
-    """Chama a API do Groq com contexto extra"""
     headers = {
         "Authorization": f"Bearer {API_KEY}",
         "Content-Type": "application/json"
@@ -122,7 +91,7 @@ def chamar_groq(prompt, contexto_extra=""):
     
     mensagem = MANUAL
     if contexto_extra:
-        mensagem += f"\n\nInformação adicional sobre o canal/público: {contexto_extra}"
+        mensagem += f"\n\nInformação adicional: {contexto_extra}"
     
     data = {
         "model": "llama-3.3-70b-versatile",
@@ -136,34 +105,54 @@ def chamar_groq(prompt, contexto_extra=""):
     
     try:
         response = requests.post(API_URL, headers=headers, json=data, timeout=30)
-        
         if response.status_code == 200:
             resultado = response.json()
             return resultado["choices"][0]["message"]["content"]
-        else:
-            return None
-    except Exception as e:
+        return None
+    except:
         return None
 
+# ==================== VERIFICAÇÃO DE ADMIN ====================
+# Use uma senha simples para acesso à aba de aprendizado
+# Isso é mais simples que verificar e-mail
+
+def verificar_admin():
+    """Verifica se o usuário tem acesso admin via senha"""
+    if "admin_autenticado" not in st.session_state:
+        st.session_state.admin_autenticado = False
+    
+    if st.session_state.admin_autenticado:
+        return True
+    
+    # Mostrar campo de senha
+    with st.sidebar:
+        st.markdown("---")
+        senha = st.text_input("🔐 Acesso Admin", type="password", placeholder="Digite a senha")
+        if senha == "admin123":  # <-- ALTERE ESTA SENHA
+            st.session_state.admin_autenticado = True
+            st.rerun()
+    
+    return False
+
 # ==================== INTERFACE ====================
-# Inicializar banco de dados
 init_db()
 
-# Verificação silenciosa da API (sem mensagem "Sistema pronto")
-teste_api = chamar_groq("Diga OK")
-if not teste_api:
+# Verificar se API está funcionando (silencioso)
+teste = chamar_groq("Diga OK")
+if not teste:
     st.error("❌ Erro de conexão com a IA. Verifique sua chave API.")
 
-# Abas: Revisar e Criar são públicas; Aprendizado só para admin
-aba1, aba2 = st.tabs(["✏️ Revisar Texto", "✨ Criar Texto"])
+# Criar abas
+abas = ["✏️ Revisar Texto", "✨ Criar Texto"]
 
-# Se for admin, adicionar a terceira aba
-if is_admin():
-    aba1, aba2, aba3 = st.tabs(["✏️ Revisar Texto", "✨ Criar Texto", "📊 Aprendizado"])
-else:
-    aba1, aba2 = st.tabs(["✏️ Revisar Texto", "✨ Criar Texto"])
+# Adicionar aba de aprendizado se for admin
+if verificar_admin():
+    abas.append("📊 Aprendizado")
 
-with aba1:
+tab1, tab2, *tab3 = st.tabs(abas)
+
+# ==================== ABA 1: REVISAR ====================
+with tab1:
     st.subheader("Revisão de Conteúdo")
     
     texto_original = st.text_area("Texto para revisar:", height=120)
@@ -183,23 +172,22 @@ with aba1:
                 
                 if resultado:
                     col_orig, col_rev = st.columns(2)
-                    
                     with col_orig:
                         st.markdown("**📄 Original**")
                         st.info(texto_original)
-                    
                     with col_rev:
                         st.markdown("**✅ Revisado**")
                         st.success(resultado)
                     
-                    if salvar_revisao(texto_original, resultado, contexto):
-                        st.caption("💾 Revisão salva para aprendizado")
+                    salvar_revisao(texto_original, resultado, contexto)
+                    st.caption("💾 Revisão salva para aprendizado")
                 else:
                     st.error("Erro ao revisar. Tente novamente.")
         else:
             st.warning("Digite um texto para revisar")
 
-with aba2:
+# ==================== ABA 2: CRIAR ====================
+with tab2:
     st.subheader("Criação de Conteúdo")
     
     col1, col2 = st.columns(2)
@@ -230,9 +218,9 @@ with aba2:
         else:
             st.warning("Digite o assunto")
 
-# Aba de Aprendizado (só aparece para admin)
-if 'aba3' in locals():
-    with aba3:
+# ==================== ABA 3: APRENDIZADO (se existir) ====================
+if len(tab3) > 0:
+    with tab3[0]:
         st.subheader("📊 Aprendizado e Insights")
         
         insights = get_insights()
@@ -242,12 +230,8 @@ if 'aba3' in locals():
                 st.metric("Total de revisões salvas", insights["total"])
             with col2:
                 st.metric("Revisões na última semana", insights["ultima_semana"])
-            
-            if insights["palavras_comuns"]:
-                st.write("**Palavras mais frequentes nos textos:**")
-                st.write(", ".join(set(insights["palavras_comuns"])))
         else:
-            st.info("Nenhuma revisão salva ainda. Use a ferramenta de revisão e os textos serão armazenados aqui.")
+            st.info("Nenhuma revisão salva ainda.")
         
         st.divider()
         
@@ -266,4 +250,4 @@ if 'aba3' in locals():
             st.write("Nenhuma revisão salva ainda.")
 
 st.divider()
-st.caption("📌 IA: Groq (Llama 3.3 70B) | Revisões salvas para aprendizado contínuo")
+st.caption("📌 IA: Groq (Llama 3.3 70B) | Acesso Admin no menu lateral")
