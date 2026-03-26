@@ -10,6 +10,20 @@ st.set_page_config(page_title="Revisor de Tom e Voz", page_icon="📝")
 st.title("📝 Revisor e Criador de Conteúdo")
 st.caption("Seguindo o manual de tom e voz do Governo de SP")
 
+# ==================== CONFIGURAÇÃO DE ADMIN ====================
+# Defina aqui os e-mails que podem ver o aprendizado
+ADMINS = ["sip.poupatempo1@gmail.com"]  # <-- SUBSTITUA PELO SEU E-MAIL
+
+def is_admin():
+    """Verifica se o usuário atual é administrador"""
+    # No Streamlit Cloud, o e-mail do usuário pode ser obtido
+    try:
+        user_email = st.experimental_user.get("email", "")
+        return user_email in ADMINS
+    except:
+        # Se não conseguir obter e-mail, só mostra se for admin configurado
+        return False
+
 # ==================== MANUAL DE TOM E VOZ ====================
 MANUAL = """
 Você é um especialista em comunicação do Governo de São Paulo.
@@ -59,7 +73,6 @@ def salvar_revisao(original, revisado, contexto=""):
         conn.close()
         return True
     except Exception as e:
-        st.error(f"Erro ao salvar: {e}")
         return False
 
 def listar_revisoes():
@@ -78,11 +91,9 @@ def get_insights():
     if df.empty:
         return None
     
-    # Contar revisões
     total = len(df)
     ultima_semana = len(df[df['data'] > (datetime.now().isoformat().split('T')[0])])
     
-    # Padrões simples
     palavras_comuns = []
     for texto in df['texto_original'].head(20):
         palavras_comuns.extend(texto.lower().split()[:5])
@@ -97,7 +108,7 @@ def get_insights():
 try:
     API_KEY = st.secrets["GROQ_API_KEY"]
 except:
-    st.error("Configure a chave API GROQ_API_KEY em Settings → Secrets")
+    st.error("❌ Configure a chave API GROQ_API_KEY em Settings → Secrets")
     st.stop()
 
 API_URL = "https://api.groq.com/openai/v1/chat/completions"
@@ -109,7 +120,6 @@ def chamar_groq(prompt, contexto_extra=""):
         "Content-Type": "application/json"
     }
     
-    # Montar mensagem com contexto
     mensagem = MANUAL
     if contexto_extra:
         mensagem += f"\n\nInformação adicional sobre o canal/público: {contexto_extra}"
@@ -139,17 +149,25 @@ def chamar_groq(prompt, contexto_extra=""):
 # Inicializar banco de dados
 init_db()
 
-# Remover diagnóstico - mostrar apenas status sucinto
-st.success("✅ Sistema pronto")
+# Verificação silenciosa da API (sem mensagem "Sistema pronto")
+teste_api = chamar_groq("Diga OK")
+if not teste_api:
+    st.error("❌ Erro de conexão com a IA. Verifique sua chave API.")
 
-aba1, aba2, aba3 = st.tabs(["✏️ Revisar Texto", "✨ Criar Texto", "📊 Aprendizado"])
+# Abas: Revisar e Criar são públicas; Aprendizado só para admin
+aba1, aba2 = st.tabs(["✏️ Revisar Texto", "✨ Criar Texto"])
+
+# Se for admin, adicionar a terceira aba
+if is_admin():
+    aba1, aba2, aba3 = st.tabs(["✏️ Revisar Texto", "✨ Criar Texto", "📊 Aprendizado"])
+else:
+    aba1, aba2 = st.tabs(["✏️ Revisar Texto", "✨ Criar Texto"])
 
 with aba1:
     st.subheader("Revisão de Conteúdo")
     
     texto_original = st.text_area("Texto para revisar:", height=120)
     
-    # Campo de contexto extra
     with st.expander("➕ Contexto adicional (opcional)"):
         contexto = st.text_area(
             "Informe o canal, público ou situação:",
@@ -164,7 +182,6 @@ with aba1:
                 resultado = chamar_groq(prompt, contexto)
                 
                 if resultado:
-                    # Layout melhorado com colunas e expansão
                     col_orig, col_rev = st.columns(2)
                     
                     with col_orig:
@@ -175,7 +192,6 @@ with aba1:
                         st.markdown("**✅ Revisado**")
                         st.success(resultado)
                     
-                    # Salvar revisão
                     if salvar_revisao(texto_original, resultado, contexto):
                         st.caption("💾 Revisão salva para aprendizado")
                 else:
@@ -192,7 +208,6 @@ with aba2:
     with col2:
         tom = st.selectbox("Tom:", ["Informativo", "Empático", "Motivador", "Direto"])
     
-    # Campo de contexto extra
     with st.expander("➕ Contexto adicional (opcional)"):
         contexto_criacao = st.text_area(
             "Informe o canal, público ou situação:",
@@ -209,49 +224,46 @@ with aba2:
                 if resultado:
                     st.markdown("**✨ Texto criado**")
                     st.success(resultado)
-                    
-                    # Salvar criação
                     salvar_revisao(f"[CRIAÇÃO] Assunto: {assunto} | Tom: {tom}", resultado, contexto_criacao)
                 else:
                     st.error("Erro ao criar. Tente novamente.")
         else:
             st.warning("Digite o assunto")
 
-with aba3:
-    st.subheader("📊 Aprendizado e Insights")
-    
-    # Mostrar insights
-    insights = get_insights()
-    if insights:
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("Total de revisões salvas", insights["total"])
-        with col2:
-            st.metric("Revisões na última semana", insights["ultima_semana"])
+# Aba de Aprendizado (só aparece para admin)
+if 'aba3' in locals():
+    with aba3:
+        st.subheader("📊 Aprendizado e Insights")
         
-        if insights["palavras_comuns"]:
-            st.write("**Palavras mais frequentes nos textos:**")
-            st.write(", ".join(set(insights["palavras_comuns"])))
-    else:
-        st.info("Nenhuma revisão salva ainda. Use a ferramenta de revisão e os textos serão armazenados aqui.")
-    
-    st.divider()
-    
-    # Mostrar últimas revisões
-    st.write("**Últimas revisões salvas:**")
-    df = listar_revisoes()
-    if not df.empty:
-        # Mostrar apenas as 5 últimas
-        for _, row in df.head(5).iterrows():
-            with st.expander(f"📝 Revisão de {row['data'][:16]}"):
-                st.write("**Original:**")
-                st.write(row['texto_original'][:200] + "..." if len(row['texto_original']) > 200 else row['texto_original'])
-                st.write("**Revisado:**")
-                st.write(row['texto_revisado'][:200] + "..." if len(row['texto_revisado']) > 200 else row['texto_revisado'])
-                if row['contexto']:
-                    st.write(f"**Contexto:** {row['contexto'][:100]}")
-    else:
-        st.write("Nenhuma revisão salva ainda.")
+        insights = get_insights()
+        if insights:
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Total de revisões salvas", insights["total"])
+            with col2:
+                st.metric("Revisões na última semana", insights["ultima_semana"])
+            
+            if insights["palavras_comuns"]:
+                st.write("**Palavras mais frequentes nos textos:**")
+                st.write(", ".join(set(insights["palavras_comuns"])))
+        else:
+            st.info("Nenhuma revisão salva ainda. Use a ferramenta de revisão e os textos serão armazenados aqui.")
+        
+        st.divider()
+        
+        st.write("**Últimas revisões salvas:**")
+        df = listar_revisoes()
+        if not df.empty:
+            for _, row in df.head(10).iterrows():
+                with st.expander(f"📝 Revisão de {row['data'][:16]}"):
+                    st.write("**Original:**")
+                    st.write(row['texto_original'][:300] + "..." if len(row['texto_original']) > 300 else row['texto_original'])
+                    st.write("**Revisado:**")
+                    st.write(row['texto_revisado'][:300] + "..." if len(row['texto_revisado']) > 300 else row['texto_revisado'])
+                    if row['contexto']:
+                        st.write(f"**Contexto:** {row['contexto'][:100]}")
+        else:
+            st.write("Nenhuma revisão salva ainda.")
 
 st.divider()
 st.caption("📌 IA: Groq (Llama 3.3 70B) | Revisões salvas para aprendizado contínuo")
