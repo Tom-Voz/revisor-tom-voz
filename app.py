@@ -111,7 +111,8 @@ def chamar_groq(prompt, contexto_extra=""):
             resultado = response.json()
             return resultado["choices"][0]["message"]["content"]
         else:
-            st.error(f"Erro da API Groq: {response.status_code} - {response.text}")
+            st.error(f"Erro da API Groq: {response.status_code}")
+            st.code(response.text)
             return None
     except Exception as e:
         st.error(f"Erro de conexão: {e}")
@@ -248,4 +249,4 @@ if len(tab3) > 0:
             st.write("Nenhuma revisão salva ainda.")
 
 st.divider()
-st.caption("📌 IA: Groq (Llama 3.3 70B) | Acesso Admin no menu lateral")
+st.caption("📌 IA: Groq (GPT-OSS 120B) | Acesso Admin no menu lateral")
