@@ -34,13 +34,19 @@ export default {
       );
     }
 
-    if (pluginKey !== env.PLUGIN_KEY) {
-      return json(
-        { error: 'X-Plugin-Key inválida.' },
-        401,
-        corsHeaders
-      );
-    }
+if (pluginKey !== env.PLUGIN_KEY) {
+  return json(
+    {
+      error: 'Chave diferente',
+      chaveRecebidaExiste: !!pluginKey,
+      tamanhoChaveRecebida: pluginKey?.length || 0,
+      chaveConfiguradaExiste: !!env.PLUGIN_KEY,
+      tamanhoChaveConfigurada: env.PLUGIN_KEY?.length || 0
+    },
+    401,
+    corsHeaders
+  );
+}
 
     try {
       const body = await request.json();
