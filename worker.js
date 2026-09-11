@@ -1,5 +1,7 @@
+import { env } from 'cloudflare:workers';
+
 export default {
-  async fetch(request, env) {
+  async fetch(request) {
     const corsHeaders = {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -26,7 +28,7 @@ export default {
     }
 
     // --- LEITURA ROBUSTA DO SECRET ---
-    // A documentação oficial confirma que Secrets são acessados diretamente via `env`[reference:2].
+    // Acessa o secret diretamente do objeto env importado.
     let groqApiKey = env.GROQ_API_KEY;
 
     // Limpeza defensiva: remove aspas e espaços que possam ter sido salvos por engano.
