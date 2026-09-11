@@ -4,6 +4,7 @@ compatibility_date = "2026-09-11"
 
 [secrets]
 GROQ_API_KEY = "required"
+PLUGIN_KEY = "required"
 
 [observability.logs]
 enabled = true
