@@ -96,7 +96,7 @@ def chamar_groq(prompt, contexto_extra=""):
         mensagem += f"\n\nInformação adicional: {contexto_extra}"
     
     data = {
-        "model": "llama-3.1-8b-instant",
+        "model": "llama-3.1-70b-versatile",
         "messages": [
             {"role": "system", "content": mensagem},
             {"role": "user", "content": prompt}
