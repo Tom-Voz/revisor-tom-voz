@@ -25,19 +25,14 @@ export default {
       });
     }
 
-    // --- CORREÇÃO: LER O SECRET CORRETAMENTE ---
-    let groqApiKey;
-    try {
-      // A forma correta de ler Secrets no Cloudflare Workers
-      groqApiKey = await env.GROQ_API_KEY.get();
-    } catch (e) {
-      // Fallback: tenta ler como variável de ambiente comum (para compatibilidade)
-      groqApiKey = env.GROQ_API_KEY;
-    }
+    // --- CORREÇÃO DEFINITIVA: ACESSO DIRETO AO SECRET ---
+    // A documentação da Cloudflare confirma que Secrets são acessados
+    // diretamente através do objeto env, sem chamadas assíncronas.
+    const groqApiKey = env.GROQ_API_KEY;
 
     if (!groqApiKey) {
       return new Response(JSON.stringify({ 
-        error: 'GROQ_API_KEY não configurada ou não acessível.' 
+        error: 'GROQ_API_KEY não configurada ou não acessível. Verifique o Secret no painel da Cloudflare.' 
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -60,7 +55,7 @@ export default {
         const resposta = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${groqApiKey}`,
+            'Authorization': `Bearer ${groqApiKey}`, // Usa a chave lida corretamente
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
