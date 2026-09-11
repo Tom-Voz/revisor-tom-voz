@@ -25,10 +25,14 @@ export default {
       });
     }
 
-    // --- CORREÇÃO DEFINITIVA: ACESSO DIRETO AO SECRET ---
-    // A documentação da Cloudflare confirma que Secrets são acessados
-    // diretamente através do objeto env, sem chamadas assíncronas.
-    const groqApiKey = env.GROQ_API_KEY;
+    // --- LEITURA ROBUSTA DO SECRET ---
+    // A documentação oficial confirma que Secrets são acessados diretamente via `env`[reference:2].
+    let groqApiKey = env.GROQ_API_KEY;
+
+    // Limpeza defensiva: remove aspas e espaços que possam ter sido salvos por engano.
+    if (groqApiKey) {
+      groqApiKey = groqApiKey.trim().replace(/^["']|["']$/g, '');
+    }
 
     if (!groqApiKey) {
       return new Response(JSON.stringify({ 
@@ -55,7 +59,7 @@ export default {
         const resposta = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${groqApiKey}`, // Usa a chave lida corretamente
+            'Authorization': `Bearer ${groqApiKey}`,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
