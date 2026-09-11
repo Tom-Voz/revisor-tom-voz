@@ -24,16 +24,27 @@ export default {
     }
 
     // Verifica a chave enviada pelo plugin
-    const pluginKey = request.headers.get('X-Plugin-Key');
+const pluginKey = request.headers.get('X-Plugin-Key');
+
+console.log('DIAGNOSTICO_AUTH', {
+  recebeuHeader: !!pluginKey,
+  tamanhoRecebido: pluginKey ? pluginKey.length : 0,
+  existeEnv: !!env.PLUGIN_KEY,
+  tamanhoEnv: env.PLUGIN_KEY ? env.PLUGIN_KEY.length : 0,
+  tipoEnv: typeof env.PLUGIN_KEY
+});
 
 if (!pluginKey || pluginKey !== env.PLUGIN_KEY) {
   return json(
     {
       error: 'Chave do plugin inválida',
-      recebeuHeader: !!pluginKey,
-      tamanhoRecebido: pluginKey ? pluginKey.length : 0,
-      existeSecret: !!env.PLUGIN_KEY,
-      tamanhoSecret: env.PLUGIN_KEY ? env.PLUGIN_KEY.length : 0
+      diagnostico: {
+        recebeuHeader: !!pluginKey,
+        tamanhoRecebido: pluginKey ? pluginKey.length : 0,
+        existeEnv: !!env.PLUGIN_KEY,
+        tamanhoEnv: env.PLUGIN_KEY ? env.PLUGIN_KEY.length : 0,
+        tipoEnv: typeof env.PLUGIN_KEY
+      }
     },
     401,
     corsHeaders
