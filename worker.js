@@ -26,13 +26,19 @@ export default {
     // Verifica a chave enviada pelo plugin
     const pluginKey = request.headers.get('X-Plugin-Key');
 
-    if (!pluginKey || pluginKey !== env.PLUGIN_KEY) {
-      return json(
-        { error: 'Chave do plugin inválida' },
-        401,
-        corsHeaders
-      );
-    }
+if (!pluginKey || pluginKey !== env.PLUGIN_KEY) {
+  return json(
+    {
+      error: 'Chave do plugin inválida',
+      recebeuHeader: !!pluginKey,
+      tamanhoRecebido: pluginKey ? pluginKey.length : 0,
+      existeSecret: !!env.PLUGIN_KEY,
+      tamanhoSecret: env.PLUGIN_KEY ? env.PLUGIN_KEY.length : 0
+    },
+    401,
+    corsHeaders
+  );
+}
 
     // Verifica a chave da Groq
     if (!env.GROQ_API_KEY) {
