@@ -75,14 +75,6 @@ def get_insights():
     }
 
 # ==================== FUNÇÃO DE IA (GROQ) ====================
-try:
-    API_KEY = st.secrets["GROQ_API_KEY"]
-except:
-    st.error("❌ Configure a chave API GROQ_API_KEY em Settings → Secrets")
-    st.stop()
-
-API_URL = "https://api.groq.com/openai/v1/chat/completions"
-
 def chamar_groq(prompt, contexto_extra=""):
     headers = {
         "Authorization": f"Bearer {API_KEY}",
@@ -108,10 +100,14 @@ def chamar_groq(prompt, contexto_extra=""):
         if response.status_code == 200:
             resultado = response.json()
             return resultado["choices"][0]["message"]["content"]
+        else:
+            # MOSTRAR O ERRO REAL
+            st.error(f"Erro da API Groq: {response.status_code} - {response.text}")
+            return None
+    except Exception as e:
+        # MOSTRAR O ERRO REAL
+        st.error(f"Erro de conexão: {e}")
         return None
-    except:
-        return None
-
 # ==================== VERIFICAÇÃO DE ADMIN ====================
 # Use uma senha simples para acesso à aba de aprendizado
 # Isso é mais simples que verificar e-mail
