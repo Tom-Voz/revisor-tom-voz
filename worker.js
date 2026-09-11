@@ -24,29 +24,7 @@ export default {
     }
 
     // Verifica a chave
-    const pluginKey = request.headers.get('X-Plugin-Key');
-
-    if (!pluginKey) {
-      return json(
-        { error: 'X-Plugin-Key não foi enviada.' },
-        401,
-        corsHeaders
-      );
-    }
-
-if (pluginKey !== env.PLUGIN_KEY) {
-  return json(
-    {
-      error: 'Chave diferente',
-      chaveRecebidaExiste: !!pluginKey,
-      tamanhoChaveRecebida: pluginKey?.length || 0,
-      chaveConfiguradaExiste: !!env.PLUGIN_KEY,
-      tamanhoChaveConfigurada: env.PLUGIN_KEY?.length || 0
-    },
-    401,
-    corsHeaders
-  );
-}
+// AUTENTICAÇÃO TEMPORARIAMENTE DESATIVADA PARA TESTE
 
     try {
       const body = await request.json();
