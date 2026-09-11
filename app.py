@@ -74,6 +74,16 @@ def get_insights():
         "ultima_semana": len(df[df['data'] > (datetime.now().isoformat().split('T')[0])])
     }
 
+# ==================== LEITURA DA CHAVE DA API ====================
+try:
+    API_KEY = st.secrets["GROQ_API_KEY"]
+except Exception as e:
+    st.error(f"❌ Erro ao ler a chave API: {e}")
+    st.info("Verifique se em Settings → Secrets existe: GROQ_API_KEY = \"sua_chave\"")
+    st.stop()
+
+API_URL = "https://api.groq.com/openai/v1/chat/completions"
+
 # ==================== FUNÇÃO DE IA (GROQ) ====================
 def chamar_groq(prompt, contexto_extra=""):
     headers = {
@@ -101,17 +111,13 @@ def chamar_groq(prompt, contexto_extra=""):
             resultado = response.json()
             return resultado["choices"][0]["message"]["content"]
         else:
-            # MOSTRAR O ERRO REAL
             st.error(f"Erro da API Groq: {response.status_code} - {response.text}")
             return None
     except Exception as e:
-        # MOSTRAR O ERRO REAL
         st.error(f"Erro de conexão: {e}")
         return None
-# ==================== VERIFICAÇÃO DE ADMIN ====================
-# Use uma senha simples para acesso à aba de aprendizado
-# Isso é mais simples que verificar e-mail
 
+# ==================== VERIFICAÇÃO DE ADMIN ====================
 def verificar_admin():
     """Verifica se o usuário tem acesso admin via senha"""
     if "admin_autenticado" not in st.session_state:
@@ -120,11 +126,10 @@ def verificar_admin():
     if st.session_state.admin_autenticado:
         return True
     
-    # Mostrar campo de senha
     with st.sidebar:
         st.markdown("---")
         senha = st.text_input("🔐 Acesso Admin", type="password", placeholder="Digite a senha")
-        if senha == "admin123":  # <-- ALTERE ESTA SENHA
+        if senha == "admin123":
             st.session_state.admin_autenticado = True
             st.rerun()
     
@@ -133,15 +138,12 @@ def verificar_admin():
 # ==================== INTERFACE ====================
 init_db()
 
-# Verificar se API está funcionando (silencioso)
+# Testar conexão com a Groq (mostra o erro real se falhar)
 teste = chamar_groq("Diga OK")
-if not teste:
-    st.error("❌ Erro de conexão com a IA. Verifique sua chave API.")
 
 # Criar abas
 abas = ["✏️ Revisar Texto", "✨ Criar Texto"]
 
-# Adicionar aba de aprendizado se for admin
 if verificar_admin():
     abas.append("📊 Aprendizado")
 
